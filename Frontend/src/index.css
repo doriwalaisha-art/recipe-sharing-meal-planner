@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #FFF8F3;
+    color: #1F2937;
+  }
+}
+
+.fc .fc-button {
+    background-color: #f97316 !important;
+    border: none !important;
+    color: white !important;
+    padding: 8px 14px !important;
+    border-radius: 8px !important;
+}
+
+.fc .fc-button:hover {
+    background-color: #ea580c !important;
+}
+
+.fc .fc-button:disabled {
+    background-color: #9ca3af !important;
+    color: white !important;
+}
+
+.fc .fc-toolbar-title {
+    font-size: 2rem !important;
+    font-weight: bold;
+}
