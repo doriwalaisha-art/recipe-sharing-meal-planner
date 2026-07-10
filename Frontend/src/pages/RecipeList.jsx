@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchRecipes } from '../redux/slices/recipeSlice';
+import { fetchRecipes } from '../redux/Slices/recipeSlice';
 import RecipeCard from '../components/RecipeCard';
 import { Link } from 'react-router-dom';
 import { Plus, AlertTriangle } from 'lucide-react';

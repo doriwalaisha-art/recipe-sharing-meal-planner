@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { logout } from '../../redux/slices/authSlice';
+import { logout } from '../../redux/Slices/authSlice';
 import { LogOut, User, UtensilsCrossed, Menu, X, CircleUserRound} from 'lucide-react';
 
 const Navbar = () => {
