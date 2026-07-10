@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {useForm,useFieldArray} from 'react-hook-form';
+import { toast } from "react-toastify";
 import {useNavigate} from 'react-router-dom';
 import API from '../api/axios';
 import { Plus , Trash2} from 'lucide-react';
@@ -29,9 +30,12 @@ const RecipeCreate  = () => {
 
             replaceIng(response.data.ingredients);
             replaceIns(response.data.instructions);
+            toast.success("Ingredients and instructions generated successfully!");
         }catch (error) {
-            console.log(error);
-            alert('Failed to generate recipe from AI');
+        toast.error(
+            error.response?.data?.message || "Failed to generate recipe.Please Enter valid Recipe Title & Description"
+        );
+
         }finally {
             setLoadingAI(false);
         }

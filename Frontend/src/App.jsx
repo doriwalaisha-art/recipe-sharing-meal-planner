@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { ToastContainer } from 'react-toastify';
 import Navbar from './components/layout/Navbar';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -38,8 +39,20 @@ function App() {
                 <Route path="/mealplanner" element={isAuthenticated ? <MealPlanner/> : <Navigate to = "/login"/>}/>
                 
                 <Route path="*" element={<Navigate to="/" />} />
+
             </Routes>
+            <ToastContainer
+                position="top-right"
+                autoClose={3000}
+                hideProgressBar={false}
+                newestOnTop
+                closeOnClick
+                pauseOnHover
+                theme="colored"
+            />
+
         </>
+        
     );
 }
 
