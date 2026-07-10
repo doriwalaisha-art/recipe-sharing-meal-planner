@@ -18,14 +18,11 @@
 import axios from "axios";
 
 const API = axios.create({
-     baseURL: "http://172.20.10.14:5000/api"
-    // baseURL: "http://172.20.10.14:5000/api"
+    baseURL: import.meta.env.VITE_API_URL
 });
 
 API.interceptors.request.use((req) => {
-
     const token = localStorage.getItem("token");
-    console.log("TOKEN SENT:", token); 
 
     if (token) {
         req.headers.Authorization = `Bearer ${token}`;
