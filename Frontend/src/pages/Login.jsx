@@ -4,6 +4,8 @@ import API from '../api/axios';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../redux/Slices/authSlice';
 import { Mail, Lock } from 'lucide-react';
+import { GoogleLogin } from "@react-oauth/google";
+import { toast } from "react-toastify";
 
 const Login = () => {
     const { register, handleSubmit, formState: { errors } } = useForm();
@@ -16,7 +18,7 @@ const Login = () => {
             dispatch(setCredentials(user));
             navigate('/');
         }catch (err) {
-            alert(err.response?.data?.message || 'Login failed');
+            toast.error(err.response?.data?.message || "Login failed");
         }
     };
 
@@ -53,6 +55,41 @@ const Login = () => {
                     <button type='submit' className="w-full py-3 bg-primary text-white rounded-xl font-semibold hover:bg-secondary transition-colors shadow-lg shadow-orange-200">
                         Login
                     </button>
+
+                    <div className="relative my-5">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-300"></div>
+                        </div>
+
+                        <div className="relative flex justify-center text-sm">
+                            <span className="bg-white px-3 text-gray-500">
+                                OR
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center">
+                        <GoogleLogin
+                          useOneTap={false}
+                          onSuccess={async (credentialResponse) => {
+                            try {
+                              const { data: user } = await API.post('/auth/google', {
+                                token: credentialResponse.credential
+                              });
+                              dispatch(setCredentials(user));
+                              toast.success("Logged in successfully with Google!");
+                              navigate('/');
+                            } catch (err) {
+                              toast.error(err.response?.data?.message || "Google Login failed");
+                            }
+                          }}
+                          onError={() => {
+                            console.log("ERROR");
+                            toast.error("Google Login Failed");
+                          }}
+                        />
+                    </div>
+
                 </form>
 
                 <p  className="text-center mt-6 text-gray-600" >Don't Have An Account ? <Link to="/register" className="text-primary font-bold hover:underline">Register Here</Link>
