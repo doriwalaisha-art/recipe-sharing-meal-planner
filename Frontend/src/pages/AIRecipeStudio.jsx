@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 import API from "../api/axios";
 import {Sparkles} from 'lucide-react';
+import { toast } from "react-toastify";
+import { useNavigate } from "react-router-dom";
 import ChatWindow from "../components/AIRecipeStudio/ChatWindow"
 import RecipePreview from "../components/AIRecipeStudio/RecipePreview";
 
@@ -12,7 +14,41 @@ const AIRecipeStudio = () => {
         }
     ]);
     const [recipe, setRecipe] = useState(null);
-    const [isTyping, setIsTyping] = useState(false);    
+    const [isTyping, setIsTyping] = useState(false); 
+    const [categories, setCategories] = useState([]);
+
+    const [selectedCategory, setSelectedCategory] = useState("");
+
+    const [selectedImage, setSelectedImage] = useState(null);
+
+    useEffect(() => {
+    fetchCategories();
+}, []);
+
+const fetchCategories = async () => {
+    const { data } = await API.get("/categories");
+    setCategories(data);
+};
+    const navigate = useNavigate();   
+
+        const handleCreateRecipe = async () => {
+    try {
+
+        await API.post("/recipes", recipe);
+
+        toast.success("Recipe created successfully!");
+
+        navigate("/");
+
+    } catch (error) {
+
+        toast.error(
+            error.response?.data?.message ||
+            "Failed to create recipe."
+        );
+
+    }
+};
 
     const sendMessage = async (text) => {
 
@@ -40,11 +76,12 @@ const AIRecipeStudio = () => {
             ...prev,
             {
                 sender: "ai",
-                text: data.reply
+                text: data.reply,
+                action: data.action
             }
         ]);
 
-        if (data.type === "create" || data.type === "update") {
+        if (data.type === "create" || data.type === "update" || data.type === "complete") {
             setRecipe(data.recipe);
         }
 
@@ -63,12 +100,11 @@ const AIRecipeStudio = () => {
         ]);
 
     }
-
 };
     return (
 
          <div className="min-h-screen bg-bgLight px-6 py-8">
-            <div className="mb-8">
+            <div className="max-w-4xl mx-auto mb-8">
                 <div className="flex items-center gap-3">
                     <div className="bg-primary text-white p-3 rounded-2xl shadow-lg">
                         <Sparkles size={28} />
@@ -87,15 +123,30 @@ const AIRecipeStudio = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
+                <div className="max-w-4xl mx-auto">
                 <ChatWindow 
                     messages={messages}
                     sendMessage={sendMessage}
                     isTyping={isTyping}
+                    categories={categories}
+                    handleCreateRecipe={handleCreateRecipe}
+                    setSelectedImage={(image) => {
+                        setSelectedImage(image);
+                        // Convert to base64 or upload and get URL, then update recipe state
+                        if (image) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                                setRecipe(prev => ({...prev, image: reader.result}));
+                                sendMessage("I have uploaded the image.");
+                            };
+                            reader.readAsDataURL(image);
+                        }
+                    }}
+                    handleCategorySelect={(catName) => {
+                        setSelectedCategory(catName);
+                        sendMessage(`I choose the category: ${catName}`);
+                    }}
                 />
-
-                <RecipePreview recipe={recipe} />
 
             </div>
         </div>

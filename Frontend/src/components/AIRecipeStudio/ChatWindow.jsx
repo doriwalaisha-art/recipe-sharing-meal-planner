@@ -3,7 +3,7 @@ import ChatInput from "./ChatInput";
 import ChatMessage from "./ChatMessage";
 import TypingIndicator from "./TypingIndicator";
 
-const ChatWindow = ({ messages, sendMessage, isTyping }) => {
+const ChatWindow = ({ messages, sendMessage, isTyping, categories, handleCreateRecipe, setSelectedImage, handleCategorySelect }) => {
 
     return (
 
@@ -34,6 +34,10 @@ const ChatWindow = ({ messages, sendMessage, isTyping }) => {
                     <ChatMessage
                         key={index}
                         message={message}
+                        categories={categories}
+                        handleCreateRecipe={handleCreateRecipe}
+                        setSelectedImage={setSelectedImage}
+                        handleCategorySelect={handleCategorySelect}
                     />
 
                 ))}

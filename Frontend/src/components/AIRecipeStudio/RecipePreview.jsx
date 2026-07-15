@@ -1,6 +1,6 @@
-import {ChefHat, Clock3, Users, BarChart3} from "lucide-react";
+import {ChefHat, Users, BarChart3} from "lucide-react";
 
-const RecipePreview = ({ recipe }) => {
+const RecipePreview = ({recipe,onCreateRecipe,categories,selectedCategory,setSelectedCategory,selectedImage, setSelectedImage})  => {
 
   if (!recipe) {
     return (
@@ -43,22 +43,64 @@ const RecipePreview = ({ recipe }) => {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
 
-          <div className="bg-bgLight rounded-xl p-4 flex items-center gap-3">
-            <Clock3 className="text-primary" />
+    <label className="font-semibold text-gray-700">
+        Category *
+    </label>
 
-            <div>
-              <p className="text-sm text-gray-500">
-                Prep Time
-              </p>
+    <select
+        value={selectedCategory}
+        onChange={(e)=>setSelectedCategory(e.target.value)}
+        className="w-full rounded-xl border border-gray-300 px-4 py-3 focus:ring-2 focus:ring-primary outline-none"
+    >
 
-              <p className="font-semibold">
-                {recipe.prepTime}
-              </p>
-            </div>
-          </div>
+        <option value="">
+            Select Category
+        </option>
 
+        {categories?.map(category=>(
+            <option
+                key={category._id}
+                value={category._id}
+            >
+                {category.name}
+            </option>
+        ))}
+
+    </select>
+
+</div>
+
+<div className="space-y-2">
+
+    <label className="font-semibold text-gray-700">
+        Recipe Image *
+    </label>
+
+    <input
+        type="file"
+        accept="image/*"
+        onChange={(e)=>setSelectedImage(e.target.files[0])}
+        className="w-full rounded-xl border border-gray-300 px-4 py-3"
+    />
+
+</div>
+
+{selectedImage && (
+
+    <img
+        src={selectedImage ? URL.createObjectURL(selectedImage) : ""}
+        alt="Recipe"
+        className="w-full h-52 object-cover rounded-2xl border"
+    />
+
+)}
+
+
+
+
+        <div className="grid md:grid-cols-3 gap-4">
           <div className="bg-bgLight rounded-xl p-4 flex items-center gap-3">
             <ChefHat className="text-primary" />
 
@@ -92,11 +134,11 @@ const RecipePreview = ({ recipe }) => {
 
             <div>
               <p className="text-sm text-gray-500">
-                Cook Time
+                Cooking Time
               </p>
 
               <p className="font-semibold">
-                {recipe.cookTime}
+                {recipe.cookingTime}
               </p>
             </div>
           </div>
@@ -158,11 +200,17 @@ const RecipePreview = ({ recipe }) => {
 
         </div>
 
-        <button
-          className="w-full bg-primary hover:bg-secondary text-white py-3 rounded-xl transition"
-        >
-          Create Recipe
-        </button>
+       <button
+    onClick={onCreateRecipe}
+    disabled={!selectedCategory || !selectedImage}
+    className={`w-full py-3 rounded-xl font-semibold text-white transition ${
+        !selectedCategory || !selectedImage
+        ? "bg-gray-400 cursor-not-allowed"
+        : "bg-primary hover:bg-secondary"
+    }`}
+>
+    Create Recipe
+</button>
 
       </div>
 

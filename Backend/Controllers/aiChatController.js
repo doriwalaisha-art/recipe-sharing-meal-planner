@@ -18,154 +18,55 @@ const chatWithAI = async (req, res) => {
 
         const prompt = `
            You are an Expert AI Recipe Assistant and Professional Chef.
+           The user is building a recipe through conversation step-by-step.
 
-            Your job is to understand the user's message and return ONLY valid JSON.
+           Required Recipe Fields: Title, Description, Category, Cooking Time, Servings, Difficulty, Image, Ingredients, Instructions.
 
-            Current Recipe:
-            ${recipe ? JSON.stringify(recipe) : "No recipe available"}
+           Current Recipe State:
+           ${recipe && Object.keys(recipe).length > 0 ? JSON.stringify(recipe) : "Empty"}
 
-            User Message:
-            ${message}
+           User Message:
+           ${message}
 
-            ----------------------------------
-            RULES
-            ----------------------------------
+           ----------------------------------
+           RULES
+           ----------------------------------
 
-            1. If the user wants to CREATE a recipe
+           1. Extract any valid recipe fields provided by the user in their message and ADD them to the Current Recipe State. Understand natural language (e.g. "I want to make Pizza. It takes 30 mins" -> Title: Pizza, Cooking Time: 30 mins).
+           2. If the user asks to "Generate everything", generate realistic content for: description, cookingTime, servings, difficulty, ingredients, instructions. DO NOT generate category or image.
+           3. If the user asks to generate a specific missing field (e.g. "Generate ingredients"), generate it and add it to the state.
+           4. Determine the updated recipe state based on the rules above.
+           5. Check the updated recipe state to see which required fields are STILL MISSING.
+           6. If there are missing fields, choose the FIRST missing field and formulate a natural language question asking the user for it.
+              - If the missing field is "Category", your reply must ask them to choose a category, and set action to "ask_category".
+              - If the missing field is "Image", your reply must ask them to upload an image, and set action to "ask_image".
+              - For all other missing fields, set action to "ask_text".
+              - Set type to "update".
+           7. If ALL required fields (Title, Description, Category, Cooking Time, Servings, Difficulty, Image, Ingredients, Instructions) are present, set type to "complete", reply "Your recipe is ready!", and action to "ready".
+           8. If the user wants to MODIFY a field, update the field in the recipe state, and then evaluate again what is missing (or complete).
+           9. If the message is a cooking question not related to building this recipe, just answer it and set type to "update", action to "ask_text".
+           10. If the message is completely unrelated to cooking, set type to "invalid", reply "Please enter a valid recipe or cooking related request.", and action to "ask_text".
 
-            Examples:
-
-            - Create Paneer Pizza
-            - Make Veg Biryani
-            - I want Pasta
-            - Make a healthy breakfast
-
-            Return:
-
-            {
-              "type":"create",
-              "reply":"Short friendly response.",
-              "recipe":{
-                  "title":"",
-                  "description":"",
-                  "prepTime":"20 mins",
-                  "cookTime":"25 mins",
-                  "difficulty":"Easy",
-                  "servings":"4",
-                  "ingredients":[
-                    "..."
-                  ],
-                  "instructions":[
-                    "..."
-                  ]
+           Return ONLY valid JSON in the following format:
+           {
+              "type": "update" | "complete" | "invalid",
+              "reply": "Your conversational response",
+              "action": "ask_text" | "ask_category" | "ask_image" | "ready",
+              "recipe": {
+                  "title": "...",
+                  "description": "...",
+                  "category": "...",
+                  "cookingTime": "...",
+                  "servings": "...",
+                  "difficulty": "...",
+                  "image": "...",
+                  "ingredients": ["..."],
+                  "instructions": ["..."]
               }
-            }
+           }
 
-            ALWAYS include EVERY field.
-
-            Never leave any field empty.
-
-            ----------------------------------
-
-            2. If user wants to MODIFY the current recipe
-
-            Examples
-
-            Remove Onion
-
-            Add Cheese
-
-            Increase Servings
-
-            Make it spicy
-
-            Replace butter with olive oil
-
-            Return
-
-            {
-            "type":"update",
-            "reply":"Recipe updated successfully.",
-            "recipe":{
-                  "title":"",
-                  "description":"",
-                  "prepTime":"20 mins",
-                  "cookTime":"25 mins",
-                  "difficulty":"Easy",
-                  "servings":"4",
-                  "ingredients":[...],
-                  "instructions":[...]
-            }
-            }
-
-            Always return the COMPLETE updated recipe.
-
-            Never return only changed fields.
-
-            ----------------------------------
-
-            3. If user asks cooking questions
-
-            Examples
-
-            Can I replace butter with oil?
-
-            How do I make crispy fries?
-
-            What cheese is best for pizza?
-
-            Return
-
-            {
-            "type":"question",
-            "reply":"Answer the question."
-            }
-
-            ----------------------------------
-
-            4. If the message is NOT related to recipes or cooking
-
-            Examples
-
-            abc
-
-            demo
-
-            xyz
-
-            12345
-
-            hello
-
-            good morning
-
-            who are you
-
-            what is node js
-
-            movie
-
-            cricket
-
-            Return
-
-            {
-            "type":"invalid",
-            "reply":"Please enter a valid recipe or cooking related request."
-            }
-
-            ----------------------------------
-
-            IMPORTANT
-
-            Return ONLY JSON.
-
-            Never return markdown.
-
-            Never return explanation.
-
-            Never use \`\`\`json.
-                        `;
+           IMPORTANT: Return ONLY JSON. Never return markdown. Never use \`\`\`json. The "recipe" object MUST contain ALL fields you currently know about.
+        `;
 
         const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",

@@ -3,9 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import API from '../api/axios';
 import {
     Clock, Users, BarChart, Trash2, Edit3, ArrowLeft,
-    Scale, Droplet, Coffee, Soup, Sparkles, Package, Utensils
+    Scale, Droplet, Coffee, Soup, Sparkles, Package, Utensils,
+    Printer, Download, Image as ImageIcon, Share2
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 const RecipeDetail = () => {
     const { id } = useParams();
@@ -13,6 +16,7 @@ const RecipeDetail = () => {
     const { user: currentUser } = useSelector((state) => state.auth);
     const [recipe, setRecipe] = useState(null);
     const [isTitleExpanded, setIsTitleExpanded] = useState(false);
+    const [activeTab, setActiveTab] = useState('full');
 
     useEffect(() => {
         const getRecipe = async () => {
@@ -35,6 +39,49 @@ const RecipeDetail = () => {
             } catch (err) {
                 alert(err.response?.data?.message || "Error deleting recipe");
             }
+        }
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const handleDownloadPDF = async () => {
+        const element = document.getElementById('recipe-card-export');
+        if (!element) return;
+        const canvas = await html2canvas(element, { scale: 2 });
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF('p', 'mm', 'a4');
+        const pdfWidth = pdf.internal.pageSize.getWidth();
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        pdf.save(`${recipe.title || 'Recipe'}.pdf`);
+    };
+
+    const handleDownloadImage = async () => {
+        const element = document.getElementById('recipe-card-export');
+        if (!element) return;
+        const canvas = await html2canvas(element, { scale: 2 });
+        const link = document.createElement('a');
+        link.download = `${recipe.title || 'Recipe'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    };
+
+    const handleShare = async () => {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: recipe.title,
+                    text: `Check out this recipe: ${recipe.title}`,
+                    url: window.location.href,
+                });
+            } catch (err) {
+                console.log('Share failed:', err);
+            }
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert("Link copied to clipboard!");
         }
     };
 
@@ -126,26 +173,61 @@ const RecipeDetail = () => {
                     <ArrowLeft size={18} /> Back to recipes
                 </button>
 
-                {currentUser?._id?.toString() === (recipe.author?._id || recipe.author)?.toString() && (
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => navigate(`/recipe/edit/${recipe._id}`)}
-                            className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-sm font-semibold"
-                        >
-                            <Edit3 size={16} /> Edit
-                        </button>
-                        <button
-                            onClick={handleDelete}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-all text-sm font-semibold"
-                        >
-                            <Trash2 size={16} /> Delete
-                        </button>
-                    </div>
-                )}
+                <div className="flex gap-3 items-center">
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-sm font-semibold"
+                    >
+                        <Printer size={16} /> Print
+                    </button>
+                    {currentUser?._id?.toString() === (recipe.author?._id || recipe.author)?.toString() && (
+                        <>
+                            <button
+                                onClick={() => navigate(`/recipe/edit/${recipe._id}`)}
+                                className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 border border-gray-200 rounded-full hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-sm font-semibold"
+                            >
+                                <Edit3 size={16} /> Edit
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100 transition-all text-sm font-semibold"
+                            >
+                                <Trash2 size={16} /> Delete
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            <style>{`
+                @media print {
+                    body * { visibility: hidden; }
+                    #recipe-card-export, #recipe-card-export * { visibility: visible; }
+                    #recipe-card-export { position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; margin: 0; border: none; }
+                    .no-print { display: none !important; }
+                }
+            `}</style>
+
+            <div className="max-w-7xl mx-auto px-6 mb-8 flex justify-center no-print">
+                <div className="flex bg-white rounded-full p-1.5 shadow-sm border border-gray-200">
+                    <button 
+                        onClick={() => setActiveTab('full')}
+                        className={`px-6 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'full' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-primary hover:bg-gray-50'}`}
+                    >
+                        📖 Full Recipe
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('card')}
+                        className={`px-6 py-2.5 rounded-full text-sm font-bold flex items-center gap-2 transition-all ${activeTab === 'card' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-primary hover:bg-gray-50'}`}
+                    >
+                        🃏 Recipe Card
+                    </button>
+                </div>
             </div>
 
             <div className="max-w-7xl mx-auto px-6">
-                <div className="bg-white rounded-[2.5rem] shadow-xl shadow-orange-100/30 border border-gray-100 overflow-hidden">
+                {activeTab === 'full' && (
+                <div className="bg-white rounded-[2.5rem] shadow-xl shadow-orange-100/30 border border-gray-100 overflow-hidden no-print">
                     {/* Hero Image Section */}
                     <div className="relative h-[300px] sm:h-[400px] md:h-[480px] w-full overflow-hidden">
                         <img
@@ -275,6 +357,78 @@ const RecipeDetail = () => {
                         </div>
                     </div>
                 </div>
+                )}
+
+                {activeTab === 'card' && (
+                    <div className="flex flex-col items-center animate-fade-in w-full px-2">
+                        <div id="recipe-card-export" className="bg-[#FCF5EE] p-6 md:p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.08)] max-w-[600px] w-full border border-orange-100/50 overflow-hidden relative">
+                            {/* Top Section */}
+                            <div className="flex flex-col items-center text-center pb-4">
+                                {recipe.image && (
+                                    <img src={recipe.image} className="w-24 h-24 object-cover rounded-full shadow-md mb-4 border-4 border-white" alt={recipe.title} />
+                                )}
+                                <h2 className="text-2xl md:text-3xl font-black text-gray-800 leading-tight mb-2">{recipe.title}</h2>
+                                <span className="text-[#FF6B35] text-xs font-bold uppercase tracking-wider mb-2">{recipe.category}</span>
+                                <p className="text-gray-500 text-xs font-medium">By {authorName}</p>
+                            </div>
+                            
+                            <hr className="border-t border-orange-200/40 my-4" />
+
+                            {/* Info Row */}
+                            <div className="flex gap-3 md:gap-4 w-full justify-center pb-2">
+                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-sm border border-orange-50">
+                                    <Clock size={14} className="text-[#FF6B35]"/>
+                                    <span className="font-bold text-gray-700 text-[11px] md:text-xs">{recipe.cookingTime} mins</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-sm border border-orange-50">
+                                    <Users size={14} className="text-[#FF6B35]"/>
+                                    <span className="font-bold text-gray-700 text-[11px] md:text-xs">{recipe.servings} Servings</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full shadow-sm border border-orange-50">
+                                    <Sparkles size={14} className="text-[#FF6B35]"/>
+                                    <span className="font-bold text-gray-700 text-[11px] md:text-xs">{recipe.difficulty}</span>
+                                </div>
+                            </div>
+
+                            <hr className="border-t border-orange-200/40 my-5" />
+
+                            {/* Main Content: Two Columns on Desktop, Single on Mobile */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                                {/* Ingredients */}
+                                <div>
+                                    <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4 text-left">Ingredients</h4>
+                                    <div className="flex flex-wrap gap-2 justify-start">
+                                        {(recipe.ingredients || []).map((ing, i) => {
+                                            const rawName = parseIngredient(ing).name || ing;
+                                            const shortName = rawName.trim().split(/\s+/).slice(0, 2).join(' ').replace(/[.,;:!()]/g, '');
+                                            return (
+                                                <span key={i} className="px-3 py-1 bg-white text-gray-700 border border-gray-200 rounded-full text-[10px] md:text-xs font-semibold shadow-sm hover:-translate-y-0.5 transition-transform cursor-default capitalize">
+                                                    {shortName}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Instructions */}
+                                <div>
+                                    <h4 className="font-black text-xs text-gray-400 uppercase tracking-widest mb-4 text-left">Instructions</h4>
+                                    <div className="flex flex-col gap-3">
+                                        {(recipe.instructions || []).map((inst, i) => (
+                                            <div key={i} className="flex items-start gap-3 group">
+                                                <span className="flex-shrink-0 flex items-center justify-center font-bold text-white bg-[#FF6B35] text-[10px] w-5 h-5 rounded-full shadow-sm mt-0.5 group-hover:scale-110 transition-transform">{i + 1}</span>
+                                                <span className="text-xs font-semibold text-gray-700 capitalize leading-relaxed">
+                                                    {inst.trim().split(/\s+/).slice(0, 3).join(' ').replace(/[.,;:!]/g, '')}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                )}
             </div>
         </div>
     );
