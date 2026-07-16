@@ -11,6 +11,21 @@ const withTimeout = (promise, ms) =>
         ),
     ]);
 
+// Auto-retry helper for 429 rate limits
+const attemptGenerateWithRetry = async (ai, payload, timeoutMs = 25000, retries = 2, delayMs = 10000) => {
+    try {
+        const response = await withTimeout(ai.models.generateContent(payload), timeoutMs);
+        return response;
+    } catch (error) {
+        if ((error.status === 429 || error.message?.includes("quota") || error.message?.includes("limit")) && retries > 0) {
+            console.warn(`[AI Generate] Rate limited (429). Retrying in ${delayMs / 1000}s... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            return attemptGenerateWithRetry(ai, payload, timeoutMs, retries - 1, delayMs);
+        }
+        throw error;
+    }
+};
+
 const generateRecipe = async (req, res) => {
     try {
         const { title, description } = req.body;
@@ -40,12 +55,13 @@ NO → if they are names of people, places, random words, meaningless text, numb
 `;
 
         console.log(`[AI Generate] Requesting validation using model: ${MODEL_NAME}`);
-        const validationResponse = await withTimeout(
-            ai.models.generateContent({ 
+        const validationResponse = await attemptGenerateWithRetry(
+            ai,
+            { 
                 model: MODEL_NAME, 
                 contents: validationPrompt,
                 config: { maxOutputTokens: 10 }
-            }),
+            },
             15000
         );
 
@@ -79,15 +95,16 @@ Rules:
 `;
 
         console.log(`[AI Generate] Generating recipe using model: ${MODEL_NAME}`);
-        const recipeResponse = await withTimeout(
-            ai.models.generateContent({ 
+        const recipeResponse = await attemptGenerateWithRetry(
+            ai,
+            { 
                 model: MODEL_NAME, 
                 contents: prompt,
                 config: { 
                     responseMimeType: "application/json",
                     maxOutputTokens: 2048 
                 }
-            }),
+            },
             25000
         );
 
@@ -103,4 +120,5 @@ Rules:
         res.status(500).json({ message: error.message || "Failed to generate recipe. Please try again." });
     }
 };
+
 module.exports = { generateRecipe };
