@@ -10,6 +10,34 @@ const withTimeout = (promise, ms) =>
         ),
     ]);
 
+// Attempt generateContent with the stable model
+const attemptGenerate = async (ai, prompt) => {
+    const response = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: prompt,
+        config: { 
+            responseMimeType: "application/json",
+            maxOutputTokens: 2048
+        },
+    });
+    return response;
+};
+
+// Auto-retry helper for 429 rate limits
+const attemptGenerateWithRetry = async (ai, prompt, retries = 2, delayMs = 10000) => {
+    try {
+        const response = await withTimeout(attemptGenerate(ai, prompt), 25000);
+        return response;
+    } catch (error) {
+        if ((error.status === 429 || error.message?.includes("quota") || error.message?.includes("limit")) && retries > 0) {
+            console.warn(`[AI Chat] Rate limited (429). Retrying in ${delayMs / 1000}s... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            return attemptGenerateWithRetry(ai, prompt, retries - 1, delayMs);
+        }
+        throw error;
+    }
+};
+
 // Helper to clean Markdown wrapper
 const parseJSONResponse = (text) => {
     let clean = text
@@ -188,18 +216,9 @@ Strictly output ONLY valid JSON matching the full recipe schema.
             return res.status(400).json({ success: false, message: "Invalid action type." });
         }
 
-        const response = await withTimeout(
-            ai.models.generateContent({
-                model: MODEL_NAME,
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    maxOutputTokens: 2548
-                }
-            }),
-            30000
-        );
-
+        console.log(`[AI Chat] Requesting Gemini using model: ${MODEL_NAME}`);
+        const response = await attemptGenerateWithRetry(ai, prompt);
+        console.log(`[AI Chat] Generation successful`);
         const result = parseJSONResponse(response.text);
         return res.status(200).json({ success: true, recipe: result });
 
