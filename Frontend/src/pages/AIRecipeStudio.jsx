@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, RefreshCw } from "lucide-react";
+import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, RefreshCw, Upload } from "lucide-react";
 import API from "../api/axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -12,7 +12,8 @@ const STEPS = [
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
     { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
     { key: "ingredients", question: "Provide the list of ingredients (separated by commas), or let me generate them:", placeholder: "e.g., 200g Paneer, 2 tomatoes, 1 onion...", chips: ["Generate Ingredients"] },
-    { key: "instructions", question: "Provide step-by-step instructions (separated by commas or dots), or let me generate them:", placeholder: "e.g., Cut paneer, Saute tomatoes, Add spices...", chips: ["Generate Instructions"] }
+    { key: "instructions", question: "Provide step-by-step instructions (separated by commas or dots), or let me generate them:", placeholder: "e.g., Cut paneer, Saute tomatoes, Add spices...", chips: ["Generate Instructions"] },
+    { key: "image", question: "Please upload an image for your recipe:", chips: [] } // Image upload step
 ];
 
 const LOADING_MESSAGES = [
@@ -24,8 +25,6 @@ const LOADING_MESSAGES = [
     "Preparing your recipe...",
     "Almost Done..."
 ];
-
-const DEFAULT_IMAGE = "https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800";
 
 const AIRecipeStudio = () => {
     const navigate = useNavigate();
@@ -58,11 +57,10 @@ const AIRecipeStudio = () => {
         return saved ? JSON.parse(saved) : null;
     });
 
-    // Loading Screen state
-    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+    // Image file state
+    const [selectedImage, setSelectedImage] = useState(null);
     const [isCreatingRecipe, setIsCreatingRecipe] = useState(false);
     const [successCreated, setSuccessCreated] = useState(false);
-    const [createdRecipeId, setCreatedRecipeId] = useState(null);
 
     // Edit prompt state
     const [editPrompt, setEditPrompt] = useState("");
@@ -98,6 +96,8 @@ const AIRecipeStudio = () => {
         return () => clearInterval(interval);
     }, [isTyping, currentStepIndex]);
 
+    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+
     const handleStart = () => {
         setStarted(true);
     };
@@ -106,13 +106,11 @@ const AIRecipeStudio = () => {
         const text = val || inputText;
         if (!text.trim()) return;
 
-        // User message representation
         let userMessageText = text;
         let valueToSave = text;
 
         const currentStep = STEPS[currentStepIndex];
 
-        // Format specific choice chip placeholders
         if (text === "Generate Description") {
             userMessageText = "Please generate the description for me.";
             valueToSave = "__generate__";
@@ -138,32 +136,46 @@ const AIRecipeStudio = () => {
                 ...prev,
                 { sender: "ai", text: STEPS[nextStepIndex].question }
             ]);
-        } else {
-            // All steps finished -> Generate Recipe
-            setIsTyping(true);
-            setCurrentStepIndex(STEPS.length); // Final loading stage
-            try {
-                const response = await API.post("/ai/chat", {
-                    action: "generate",
-                    recipeDraft: nextDraft
-                });
-                if (response.data?.success && response.data?.recipe) {
-                    setGeneratedRecipe(response.data.recipe);
-                    setMessages((prev) => [
-                        ...prev,
-                        { sender: "ai", text: "✨ Ta-da! Your recipe has been generated successfully! Review the details in the preview panel below." }
-                    ]);
-                } else {
-                    throw new Error("Failed to generate recipe");
-                }
-            } catch (error) {
-                console.error(error);
-                toast.error("Failed to generate recipe. Please try again.");
-                // Reset step back to notes to allow retry
-                setCurrentStepIndex(STEPS.length - 1);
-            } finally {
-                setIsTyping(false);
+        }
+    };
+
+    // Special Image selection handler
+    const handleImageSelect = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        setSelectedImage(file);
+        const updatedMessages = [...messages, { sender: "user", text: `📸 Uploaded image: ${file.name}` }];
+        setMessages(updatedMessages);
+
+        // Move to generation stage
+        const nextStepIndex = currentStepIndex + 1;
+        setCurrentStepIndex(nextStepIndex);
+        triggerGeneration(recipeDraft);
+    };
+
+    const triggerGeneration = async (draft) => {
+        setIsTyping(true);
+        try {
+            const response = await API.post("/ai/chat", {
+                action: "generate",
+                recipeDraft: draft
+            });
+            if (response.data?.success && response.data?.recipe) {
+                setGeneratedRecipe(response.data.recipe);
+                setMessages((prev) => [
+                    ...prev,
+                    { sender: "ai", text: "✨ Ta-da! Your recipe has been generated successfully! Review the details in the preview panel below." }
+                ]);
+            } else {
+                throw new Error("Failed to generate recipe");
             }
+        } catch (error) {
+            console.error(error);
+            toast.error("Failed to generate recipe. Please try again.");
+            setCurrentStepIndex(STEPS.length - 2); // Go back to instructions step to allow retry
+        } finally {
+            setIsTyping(false);
         }
     };
 
@@ -172,17 +184,19 @@ const AIRecipeStudio = () => {
         const targetStepIndex = currentStepIndex - 1;
         setCurrentStepIndex(targetStepIndex);
         
-        // Remove the last user message and the last AI response
         const newMessages = [...messages];
         while (newMessages.length > 0 && newMessages[newMessages.length - 1].sender !== "user") {
             newMessages.pop();
         }
-        if (newMessages.length > 0) newMessages.pop(); // Remove the user response
+        if (newMessages.length > 0) newMessages.pop();
         
         setMessages([
             ...newMessages,
             { sender: "ai", text: STEPS[targetStepIndex].question }
         ]);
+        if (targetStepIndex === STEPS.length - 1) {
+            setSelectedImage(null);
+        }
     };
 
     const handleReset = () => {
@@ -197,6 +211,7 @@ const AIRecipeStudio = () => {
             setRecipeDraft({
                 title: "", description: "", category: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
             });
+            setSelectedImage(null);
             setMessages([
                 { sender: "ai", text: "🤖 Welcome to AI Recipe Studio! I will guide you step-by-step to create a premium recipe. Let's start! What is the name of your dish?" }
             ]);
@@ -205,7 +220,7 @@ const AIRecipeStudio = () => {
         }
     };
 
-    // Conversational edits or regenerations
+    // Conversational edits
     const handleConversationalEdit = async () => {
         if (!editPrompt.trim()) return;
         setIsTyping(true);
@@ -278,35 +293,52 @@ const AIRecipeStudio = () => {
         }
     };
 
-    // Save recipe to DB
+    // Save recipe to DB using FormData
     const handleSaveRecipe = async () => {
         if (isCreatingRecipe) return;
         setIsCreatingRecipe(true);
 
         try {
-            const recipeData = {
-                title: generatedRecipe.title,
-                description: generatedRecipe.description || "Delightful AI generated recipe.",
-                category: generatedRecipe.category || recipeDraft.category || "Dinner",
-                difficulty: generatedRecipe.difficulty || recipeDraft.difficulty || "Medium",
-                cookingTime: parseInt(generatedRecipe.cookingTime) || 30,
-                servings: parseInt(generatedRecipe.servings) || 2,
-                ingredients: JSON.stringify(generatedRecipe.ingredients),
-                instructions: JSON.stringify(generatedRecipe.instructions),
-                image: DEFAULT_IMAGE
-            };
+            const formData = new FormData();
+            formData.append("title", generatedRecipe.title);
+            formData.append("description", generatedRecipe.description || "Delightful AI generated recipe.");
+            formData.append("category", generatedRecipe.category || recipeDraft.category || "Dinner");
+            formData.append("difficulty", generatedRecipe.difficulty || recipeDraft.difficulty || "Medium");
+            
+            let time = parseInt(generatedRecipe.cookingTime);
+            if (isNaN(time)) time = 30;
+            formData.append("cookingTime", time);
 
-            const response = await API.post("/recipes", recipeData);
+            let serv = parseInt(generatedRecipe.servings);
+            if (isNaN(serv)) serv = 2;
+            formData.append("servings", serv);
+
+            formData.append("ingredients", JSON.stringify(generatedRecipe.ingredients));
+            formData.append("instructions", JSON.stringify(generatedRecipe.instructions));
+            
+            if (selectedImage) {
+                formData.append("image", selectedImage);
+            }
+
+            const response = await API.post("/recipes", formData, {
+                headers: { "Content-Type": "multipart/form-data" }
+            });
+
             if (response.data?._id) {
-                setCreatedRecipeId(response.data._id);
                 setSuccessCreated(true);
-                toast.success("Recipe Saved Successfully!");
+                toast.success("Recipe Saved Successfully! 🎉");
                 
+                // Clear local storage
                 localStorage.removeItem("ai_studio_started");
                 localStorage.removeItem("ai_studio_step");
                 localStorage.removeItem("ai_studio_draft");
                 localStorage.removeItem("ai_studio_messages");
                 localStorage.removeItem("ai_studio_recipe");
+
+                // Auto redirect to Home Page to show the new recipe
+                setTimeout(() => {
+                    navigate("/");
+                }, 1500);
             }
         } catch (error) {
             console.error(error);
@@ -315,6 +347,8 @@ const AIRecipeStudio = () => {
             setIsCreatingRecipe(false);
         }
     };
+
+    const imagePreviewUrl = selectedImage ? URL.createObjectURL(selectedImage) : null;
 
     // Welcome Screen
     if (!started) {
@@ -429,47 +463,66 @@ const AIRecipeStudio = () => {
 
                         {/* Sticky Input / Choice chips */}
                         <div className="border-t border-orange-100 p-4 bg-white">
-                            {/* Choices Chips */}
-                            {!isTyping && currentStepIndex < STEPS.length && STEPS[currentStepIndex].chips && (
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                    {STEPS[currentStepIndex].chips.map((chip) => (
-                                        <button
-                                            key={chip}
-                                            onClick={() => handleSend(chip)}
-                                            className="px-3.5 py-1.5 bg-orange-50/60 border border-orange-100/50 text-primary rounded-full text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition duration-300 shadow-sm"
-                                        >
-                                            {chip}
-                                        </button>
-                                    ))}
-                                    {currentStepIndex > 0 && (
-                                        <button
-                                            onClick={handleUndo}
-                                            className="px-3.5 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1"
-                                        >
-                                            <RotateCcw size={10} /> Undo
-                                        </button>
+                            
+                            {/* Image Upload box if it is the image step */}
+                            {!isTyping && currentStepIndex < STEPS.length && STEPS[currentStepIndex].key === "image" ? (
+                                <div className="flex flex-col gap-2 items-center justify-center py-4 border-2 border-dashed border-orange-200 rounded-2xl bg-orange-50/5">
+                                    <label className="cursor-pointer bg-primary hover:bg-secondary text-white font-bold px-6 py-3 rounded-xl transition duration-300 shadow-sm flex items-center gap-2">
+                                        <Upload size={16} /> Upload Recipe Image File
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={handleImageSelect}
+                                        />
+                                    </label>
+                                    <p className="text-xs text-gray-400">Supported formats: JPG, PNG, WEBP (Max 5MB)</p>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Choices Chips */}
+                                    {!isTyping && currentStepIndex < STEPS.length && STEPS[currentStepIndex].chips && (
+                                        <div className="flex flex-wrap gap-2 mb-3">
+                                            {STEPS[currentStepIndex].chips.map((chip) => (
+                                                <button
+                                                    key={chip}
+                                                    onClick={() => handleSend(chip)}
+                                                    className="px-3.5 py-1.5 bg-orange-50/60 border border-orange-100/50 text-primary rounded-full text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition duration-300 shadow-sm"
+                                                >
+                                                    {chip}
+                                                </button>
+                                            ))}
+                                            {currentStepIndex > 0 && (
+                                                <button
+                                                    onClick={handleUndo}
+                                                    className="px-3.5 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1"
+                                                >
+                                                    <RotateCcw size={10} /> Undo
+                                                </button>
+                                            )}
+                                        </div>
                                     )}
-                                </div>
-                            )}
 
-                            {/* Text Input Box */}
-                            {!isTyping && currentStepIndex < STEPS.length && (
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={inputText}
-                                        onChange={(e) => setInputText(e.target.value)}
-                                        placeholder={STEPS[currentStepIndex].placeholder || "Type your answer..."}
-                                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                                        className="flex-1 border border-orange-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark bg-orange-50/10"
-                                    />
-                                    <button
-                                        onClick={() => handleSend()}
-                                        className="bg-primary hover:bg-secondary text-white px-5 rounded-xl transition duration-300 shadow-sm flex items-center justify-center"
-                                    >
-                                        <CornerDownLeft size={18} />
-                                    </button>
-                                </div>
+                                    {/* Text Input Box */}
+                                    {!isTyping && currentStepIndex < STEPS.length && (
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={inputText}
+                                                onChange={(e) => setInputText(e.target.value)}
+                                                placeholder={STEPS[currentStepIndex].placeholder || "Type your answer..."}
+                                                onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                                                className="flex-1 border border-orange-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark bg-orange-50/10"
+                                            />
+                                            <button
+                                                onClick={() => handleSend()}
+                                                className="bg-primary hover:bg-secondary text-white px-5 rounded-xl transition duration-300 shadow-sm flex items-center justify-center"
+                                            >
+                                                <CornerDownLeft size={18} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
                     </div>
@@ -514,6 +567,18 @@ const AIRecipeStudio = () => {
                                             <p className="font-extrabold text-sm text-textDark capitalize">{recipeDraft.category || "Dinner"}</p>
                                         </div>
                                     </div>
+
+                                    {/* Recipe Image Preview */}
+                                    {imagePreviewUrl && (
+                                        <div>
+                                            <h4 className="font-bold text-lg text-textDark mb-2">📸 Selected Recipe Image</h4>
+                                            <img
+                                                src={imagePreviewUrl}
+                                                alt="Uploaded preview"
+                                                className="w-full h-64 object-cover rounded-2xl border border-orange-100"
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Ingredients */}
                                     <div>
@@ -634,25 +699,11 @@ const AIRecipeStudio = () => {
                                         <Check size={32} />
                                     </div>
                                     <h2 className="text-3xl font-extrabold text-textDark mb-2">
-                                        Recipe Created Successfully! 🎉
+                                        Recipe Saved Successfully! 🎉
                                     </h2>
                                     <p className="text-gray-400 max-w-sm text-sm mb-8 leading-relaxed">
-                                        Your custom AI-generated recipe is now stored in your cookbook. You can view it or head back home.
+                                        Redirecting to the homepage so you can see your recipe listed...
                                     </p>
-                                    <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
-                                        <button
-                                            onClick={() => navigate(`/recipe/${createdRecipeId}`)}
-                                            className="w-full sm:flex-1 py-3.5 bg-primary hover:bg-secondary text-white font-bold rounded-xl shadow-sm transition"
-                                        >
-                                            View Recipe
-                                        </button>
-                                        <button
-                                            onClick={() => navigate("/")}
-                                            className="w-full sm:flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition"
-                                        >
-                                            Back Home
-                                        </button>
-                                    </div>
                                 </div>
                             )}
                         </div>
