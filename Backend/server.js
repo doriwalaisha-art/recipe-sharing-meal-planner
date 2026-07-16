@@ -26,9 +26,17 @@ app.use(express.json());
 
 
 
+const https = require("https");
+const http = require("http");
+
 // test route
 app.get("/", (req, res) => {
   res.send("API is running...");
+});
+
+// health endpoint
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
 });
 
 // connect DB
@@ -45,5 +53,20 @@ app.use('/api/ai',aiRoutes);
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  
+  // Set up self-pinging every 14 minutes to keep Render instance active
+  const FOURTEEN_MINUTES = 14 * 60 * 1000;
+  setInterval(() => {
+    const url = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+    const healthUrl = `${url}/health`;
+    console.log(`[Self-Ping] Pinging health endpoint: ${healthUrl}`);
+    
+    const client = healthUrl.startsWith("https") ? https : http;
+    client.get(healthUrl, (response) => {
+      console.log(`[Self-Ping] Received response with status: ${response.statusCode}`);
+    }).on("error", (error) => {
+      console.error(`[Self-Ping] Failed to ping health endpoint:`, error.message);
+    });
+  }, FOURTEEN_MINUTES);
 });
 
