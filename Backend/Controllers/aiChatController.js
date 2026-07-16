@@ -24,15 +24,27 @@ const attemptGenerate = async (ai, prompt) => {
 };
 
 // Auto-retry helper for 429 rate limits
-const attemptGenerateWithRetry = async (ai, prompt, retries = 2, delayMs = 10000) => {
+const attemptGenerateWithRetry = async (ai, prompt, retries = 3) => {
     try {
         const response = await withTimeout(attemptGenerate(ai, prompt), 25000);
         return response;
     } catch (error) {
-        if ((error.status === 429 || error.message?.includes("quota") || error.message?.includes("limit")) && retries > 0) {
-            console.warn(`[AI Chat] Rate limited (429). Retrying in ${delayMs / 1000}s... (${retries} attempts left)`);
-            await new Promise(resolve => setTimeout(resolve, delayMs));
-            return attemptGenerateWithRetry(ai, prompt, retries - 1, delayMs);
+        const isRateLimit = error.status === 429 || 
+                            error.message?.toLowerCase().includes("quota") || 
+                            error.message?.toLowerCase().includes("limit") ||
+                            error.message?.toLowerCase().includes("exhausted");
+
+        if (isRateLimit && retries > 0) {
+            // Parse retry delay from error message, e.g. "Please retry in 19.74s" or "retryDelay: 19s"
+            let waitMs = 15000; // Default fallback to 15 seconds
+            const match = error.message?.match(/retry in\s+(\d+(\.\d+)?)/i) || error.message?.match(/retryDelay":\s*"(\d+)/i);
+            if (match) {
+                const parsedSec = parseFloat(match[1]);
+                waitMs = Math.ceil(parsedSec) * 1000 + 1500; // Add 1.5 second safety buffer
+            }
+            console.warn(`[AI Chat] Rate limited. Waiting ${waitMs / 1000}s before retrying... (${retries} attempts left). Error details: ${error.message}`);
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+            return attemptGenerateWithRetry(ai, prompt, retries - 1);
         }
         throw error;
     }
