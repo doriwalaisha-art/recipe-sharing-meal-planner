@@ -43,7 +43,7 @@ const chatWithAI = async (req, res) => {
            4. Determine the updated recipe state based on the rules above.
            5. Check the updated recipe state to see which required fields are STILL MISSING.
            6. If there are missing fields, choose the FIRST missing field and formulate a natural language question asking the user for it.
-              - If the missing field is "Category", your reply must ask them to choose a category, and set action to "ask_category".
+              - If the missing field is "Category", your reply must ask them to choose a category, and set action to "ask_category". The valid category values are EXACTLY: Breakfast, Brunch, Lunch, Dinner, Dessert, Snacks, Beverages, Salad, Soup, Vegetarian, Non-Vegetarian, Vegan, Healthy, High-Protein, Quick Meals, Jain. Always use one of these exact values in the recipe object.
               - If the missing field is "Difficulty", your reply must ask them to choose a difficulty level, and set action to "ask_difficulty".
               - If the missing field is "Image", your reply must ask them to upload an image, and set action to "ask_image".
               - For all other missing fields, set action to "ask_text".

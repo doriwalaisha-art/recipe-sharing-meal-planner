@@ -20,10 +20,21 @@ const AIRecipeStudio = () => {
     const [selectedImage, setSelectedImage] = useState(null);
     const categories = [
         { _id: 1, name: "Breakfast" },
-        { _id: 2, name: "Lunch" },
-        { _id: 3, name: "Dinner" },
-        { _id: 4, name: "Dessert" },
-        { _id: 5, name: "Snack" },
+        { _id: 2, name: "Brunch" },
+        { _id: 3, name: "Lunch" },
+        { _id: 4, name: "Dinner" },
+        { _id: 5, name: "Dessert" },
+        { _id: 6, name: "Snacks" },
+        { _id: 7, name: "Beverages" },
+        { _id: 8, name: "Salad" },
+        { _id: 9, name: "Soup" },
+        { _id: 10, name: "Vegetarian" },
+        { _id: 11, name: "Non-Vegetarian" },
+        { _id: 12, name: "Vegan" },
+        { _id: 13, name: "Healthy" },
+        { _id: 14, name: "High-Protein" },
+        { _id: 15, name: "Quick Meals" },
+        { _id: 16, name: "Jain" },
     ];
     const difficulties = [
         { _id: 1, name: "Easy" },
