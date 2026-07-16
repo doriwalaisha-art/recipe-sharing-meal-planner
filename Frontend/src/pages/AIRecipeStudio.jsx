@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
+import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, RefreshCw } from "lucide-react";
 import API from "../api/axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
@@ -280,7 +280,7 @@ const AIRecipeStudio = () => {
                 servings: parseInt(generatedRecipe.servings) || 2,
                 ingredients: JSON.stringify(generatedRecipe.ingredients),
                 instructions: JSON.stringify(generatedRecipe.instructions),
-                image: DEFAULT_IMAGE // Default fallback food image
+                image: DEFAULT_IMAGE
             };
 
             const response = await API.post("/recipes", recipeData);
@@ -289,7 +289,6 @@ const AIRecipeStudio = () => {
                 setSuccessCreated(true);
                 toast.success("Recipe Saved Successfully!");
                 
-                // Clear draft localstorage on success
                 localStorage.removeItem("ai_studio_started");
                 localStorage.removeItem("ai_studio_step");
                 localStorage.removeItem("ai_studio_draft");
@@ -307,15 +306,15 @@ const AIRecipeStudio = () => {
     // Welcome Screen
     if (!started) {
         return (
-            <div className="min-h-[85vh] bg-bgLight dark:bg-zinc-900 flex items-center justify-center px-4">
-                <div className="max-w-md w-full bg-white dark:bg-zinc-800 rounded-3xl p-8 shadow-xl border border-orange-100 dark:border-zinc-700 text-center transform transition duration-500 hover:scale-[1.01]">
-                    <div className="bg-gradient-to-br from-primary to-orange-500 w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/20 text-white">
+            <div className="min-h-screen bg-bgLight flex items-center justify-center px-4 py-10">
+                <div className="max-w-md w-full bg-white rounded-3xl p-8 shadow-xl border border-orange-100 text-center transform transition duration-500 hover:scale-[1.01]">
+                    <div className="bg-gradient-to-br from-primary to-secondary w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-orange-500/20 text-white">
                         <Bot size={40} className="animate-bounce" />
                     </div>
-                    <h1 className="text-3xl font-extrabold text-textDark dark:text-white mb-2">
+                    <h1 className="text-3xl font-extrabold text-textDark mb-2">
                         🤖 AI Recipe Studio
                     </h1>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-6 leading-relaxed">
+                    <p className="text-gray-500 text-sm mb-6 leading-relaxed">
                         Welcome! I will help you craft a premium, customized cooking recipe step-by-step in less than one minute.
                     </p>
                     <button
@@ -330,17 +329,17 @@ const AIRecipeStudio = () => {
     }
 
     return (
-        <div className="min-h-[85vh] bg-bgLight dark:bg-zinc-900 py-8 px-4 md:px-6">
+        <div className="min-h-screen bg-bgLight py-8 px-4 md:px-6">
             <div className="max-w-5xl mx-auto">
                 
                 {/* Header */}
-                <div className="flex justify-between items-center mb-6 bg-white dark:bg-zinc-800 p-4 rounded-2xl shadow-sm border border-orange-50/50 dark:border-zinc-700">
+                <div className="flex justify-between items-center mb-6 bg-white p-4 rounded-2xl shadow-sm border border-orange-100">
                     <div className="flex items-center gap-3">
                         <div className="bg-primary/10 text-primary p-2 rounded-xl">
                             <Sparkles size={20} />
                         </div>
                         <div>
-                            <h2 className="font-bold text-lg dark:text-white">AI Recipe Studio</h2>
+                            <h2 className="font-bold text-lg text-textDark">AI Recipe Studio</h2>
                             <p className="text-xs text-gray-400">Step-by-step Chef Intelligence</p>
                         </div>
                     </div>
@@ -356,13 +355,13 @@ const AIRecipeStudio = () => {
                 {/* Main Studio View */}
                 {!generatedRecipe ? (
                     // 1. Conversation Mode
-                    <div className="bg-white dark:bg-zinc-800 rounded-3xl shadow-xl border border-orange-50/50 dark:border-zinc-700 overflow-hidden flex flex-col h-[70vh]">
+                    <div className="bg-white rounded-3xl shadow-xl border border-orange-100 overflow-hidden flex flex-col h-[70vh]">
                         {/* Progress Bar */}
-                        <div className="bg-orange-50/50 dark:bg-zinc-850 px-6 py-3 border-b border-orange-100/50 dark:border-zinc-700 flex justify-between items-center">
+                        <div className="bg-orange-50/30 px-6 py-3 border-b border-orange-100/50 flex justify-between items-center">
                             <span className="text-xs font-semibold text-primary">
                                 Progress: Step {Math.min(currentStepIndex + 1, STEPS.length)} of {STEPS.length}
                             </span>
-                            <div className="w-1/2 bg-gray-200 dark:bg-zinc-700 h-1.5 rounded-full overflow-hidden">
+                            <div className="w-1/2 bg-gray-100 h-1.5 rounded-full overflow-hidden">
                                 <div
                                     className="bg-primary h-full transition-all duration-300"
                                     style={{ width: `${(Math.min(currentStepIndex + 1, STEPS.length) / STEPS.length) * 100}%` }}
@@ -371,7 +370,7 @@ const AIRecipeStudio = () => {
                         </div>
 
                         {/* Chat Messages Panel */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-white">
                             {messages.map((m, idx) => (
                                 <div key={idx} className={`flex gap-3 ${m.sender === "user" ? "justify-end" : ""}`}>
                                     {m.sender === "ai" && (
@@ -383,13 +382,13 @@ const AIRecipeStudio = () => {
                                         className={`max-w-md rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-sm ${
                                             m.sender === "user"
                                                 ? "bg-primary text-white rounded-tr-none"
-                                                : "bg-gray-100 dark:bg-zinc-750 text-gray-800 dark:text-gray-200 rounded-tl-none"
+                                                : "bg-gray-100 text-gray-800 rounded-tl-none border border-gray-200/55"
                                         }`}
                                     >
                                         {m.text}
                                     </div>
                                     {m.sender === "user" && (
-                                        <div className="bg-gray-300 dark:bg-zinc-700 text-gray-700 dark:text-gray-300 w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center">
+                                        <div className="bg-gray-200 text-gray-700 w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center">
                                             <User size={16} />
                                         </div>
                                     )}
@@ -402,11 +401,11 @@ const AIRecipeStudio = () => {
                                     <div className="bg-primary text-white w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center animate-pulse">
                                         <Bot size={16} />
                                     </div>
-                                    <div className="bg-gray-100 dark:bg-zinc-750 rounded-2xl px-5 py-4 w-64 shadow-sm border border-orange-50/50 dark:border-zinc-700 flex flex-col gap-2">
+                                    <div className="bg-gray-100 rounded-2xl px-5 py-4 w-64 shadow-sm border border-orange-50/50 flex flex-col gap-2">
                                         <span className="text-xs text-primary font-bold animate-pulse">
                                             {LOADING_MESSAGES[loadingMessageIndex]}
                                         </span>
-                                        <div className="h-1 bg-gray-200 dark:bg-zinc-600 rounded-full overflow-hidden">
+                                        <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
                                             <div className="h-full bg-primary animate-[shimmer_1.5s_infinite] w-1/3" />
                                         </div>
                                     </div>
@@ -416,7 +415,7 @@ const AIRecipeStudio = () => {
                         </div>
 
                         {/* Sticky Input / Choice chips */}
-                        <div className="border-t border-gray-100 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-800">
+                        <div className="border-t border-orange-100 p-4 bg-white">
                             {/* Choices Chips */}
                             {!isTyping && currentStepIndex < STEPS.length && STEPS[currentStepIndex].chips && (
                                 <div className="flex flex-wrap gap-2 mb-3">
@@ -424,7 +423,7 @@ const AIRecipeStudio = () => {
                                         <button
                                             key={chip}
                                             onClick={() => handleSend(chip)}
-                                            className="px-3.5 py-1.5 bg-orange-50/60 dark:bg-zinc-750 border border-orange-100/50 dark:border-zinc-700 text-primary dark:text-orange-400 rounded-full text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition duration-300 shadow-sm"
+                                            className="px-3.5 py-1.5 bg-orange-50/60 border border-orange-100/50 text-primary rounded-full text-xs font-semibold hover:bg-primary hover:text-white hover:border-primary transition duration-300 shadow-sm"
                                         >
                                             {chip}
                                         </button>
@@ -432,7 +431,7 @@ const AIRecipeStudio = () => {
                                     {currentStepIndex > 0 && (
                                         <button
                                             onClick={handleUndo}
-                                            className="px-3.5 py-1.5 bg-gray-100 dark:bg-zinc-700 text-gray-600 dark:text-gray-300 rounded-full text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1"
+                                            className="px-3.5 py-1.5 bg-gray-100 text-gray-600 rounded-full text-xs font-semibold hover:bg-gray-200 transition flex items-center gap-1"
                                         >
                                             <RotateCcw size={10} /> Undo
                                         </button>
@@ -449,7 +448,7 @@ const AIRecipeStudio = () => {
                                         onChange={(e) => setInputText(e.target.value)}
                                         placeholder={STEPS[currentStepIndex].placeholder || "Type your answer..."}
                                         onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                                        className="flex-1 border border-gray-200 dark:border-zinc-700 dark:bg-zinc-750 dark:text-white rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary transition"
+                                        className="flex-1 border border-orange-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark bg-orange-50/10"
                                     />
                                     <button
                                         onClick={() => handleSend()}
@@ -468,16 +467,16 @@ const AIRecipeStudio = () => {
                         {/* Recipe Preview (Left) */}
                         <div className="lg:col-span-8 space-y-6">
                             {!successCreated ? (
-                                <div className="bg-white dark:bg-zinc-800 rounded-3xl p-6 shadow-xl border border-orange-50/50 dark:border-zinc-700 space-y-6">
+                                <div className="bg-white rounded-3xl p-6 shadow-xl border border-orange-100 space-y-6">
                                     <div className="flex justify-between items-start border-b pb-4">
                                         <div>
                                             <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wider">
                                                 {generatedRecipe.difficulty} • {recipeDraft.foodType || "Veg"}
                                             </span>
-                                            <h2 className="text-3xl font-extrabold text-textDark dark:text-white mt-2">
+                                            <h2 className="text-3xl font-extrabold text-textDark mt-2">
                                                 {generatedRecipe.title}
                                             </h2>
-                                            <p className="text-gray-500 dark:text-gray-400 text-sm mt-1 leading-relaxed">
+                                            <p className="text-gray-500 text-sm mt-1 leading-relaxed">
                                                 {generatedRecipe.description}
                                             </p>
                                         </div>
@@ -485,28 +484,28 @@ const AIRecipeStudio = () => {
 
                                     {/* Stats Grid */}
                                     <div className="grid grid-cols-4 gap-3 text-center">
-                                        <div className="bg-bgLight dark:bg-zinc-750 p-3 rounded-2xl border dark:border-zinc-700">
+                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
                                             <p className="text-[10px] uppercase font-bold text-gray-400">Cook Time</p>
-                                            <p className="font-extrabold text-sm text-textDark dark:text-white">{generatedRecipe.cookingTime} Min</p>
+                                            <p className="font-extrabold text-sm text-textDark">{generatedRecipe.cookingTime} Min</p>
                                         </div>
-                                        <div className="bg-bgLight dark:bg-zinc-750 p-3 rounded-2xl border dark:border-zinc-700">
+                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
                                             <p className="text-[10px] uppercase font-bold text-gray-400">Servings</p>
-                                            <p className="font-extrabold text-sm text-textDark dark:text-white">{generatedRecipe.servings}</p>
+                                            <p className="font-extrabold text-sm text-textDark">{generatedRecipe.servings}</p>
                                         </div>
-                                        <div className="bg-bgLight dark:bg-zinc-750 p-3 rounded-2xl border dark:border-zinc-700">
+                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
                                             <p className="text-[10px] uppercase font-bold text-gray-400">Calories</p>
-                                            <p className="font-extrabold text-sm text-textDark dark:text-white">{generatedRecipe.estimatedCalories || "—"}</p>
+                                            <p className="font-extrabold text-sm text-textDark">{generatedRecipe.estimatedCalories || "—"}</p>
                                         </div>
-                                        <div className="bg-bgLight dark:bg-zinc-750 p-3 rounded-2xl border dark:border-zinc-700">
+                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
                                             <p className="text-[10px] uppercase font-bold text-gray-400">Category</p>
-                                            <p className="font-extrabold text-sm text-textDark dark:text-white capitalize">{recipeDraft.category || "Dinner"}</p>
+                                            <p className="font-extrabold text-sm text-textDark capitalize">{recipeDraft.category || "Dinner"}</p>
                                         </div>
                                     </div>
 
                                     {/* Ingredients */}
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
-                                            <h4 className="font-bold text-lg text-textDark dark:text-white flex items-center gap-2">
+                                            <h4 className="font-bold text-lg text-textDark flex items-center gap-2">
                                                 🥕 Ingredients
                                             </h4>
                                             <button
@@ -518,7 +517,7 @@ const AIRecipeStudio = () => {
                                         </div>
                                         <ul className="grid md:grid-cols-2 gap-2">
                                             {generatedRecipe.ingredients?.map((ing, i) => (
-                                                <li key={i} className="bg-bgLight dark:bg-zinc-750/50 px-4 py-2.5 rounded-xl border dark:border-zinc-700/50 text-sm text-gray-700 dark:text-gray-300">
+                                                <li key={i} className="bg-bgLight px-4 py-2.5 rounded-xl border border-orange-100/30 text-sm text-gray-700">
                                                     • {ing}
                                                 </li>
                                             ))}
@@ -528,7 +527,7 @@ const AIRecipeStudio = () => {
                                     {/* Instructions */}
                                     <div>
                                         <div className="flex justify-between items-center mb-3">
-                                            <h4 className="font-bold text-lg text-textDark dark:text-white flex items-center gap-2">
+                                            <h4 className="font-bold text-lg text-textDark flex items-center gap-2">
                                                 👨‍🍳 Step-by-Step Instructions
                                             </h4>
                                             <button
@@ -541,10 +540,10 @@ const AIRecipeStudio = () => {
                                         <ol className="space-y-3">
                                             {generatedRecipe.instructions?.map((inst, i) => (
                                                 <li key={i} className="flex gap-3 items-start">
-                                                    <span className="w-6 h-6 bg-primary/10 text-primary dark:bg-orange-500/10 dark:text-orange-400 font-extrabold rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                                                    <span className="w-6 h-6 bg-primary/10 text-primary font-extrabold rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
                                                         {i + 1}
                                                     </span>
-                                                    <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                                                    <p className="text-sm text-gray-600 leading-relaxed">
                                                         {inst}
                                                     </p>
                                                 </li>
@@ -555,10 +554,10 @@ const AIRecipeStudio = () => {
                                     {/* Chef Tips */}
                                     {generatedRecipe.tips?.length > 0 && (
                                         <div>
-                                            <h4 className="font-bold text-lg text-textDark dark:text-white mb-2 flex items-center gap-2">
+                                            <h4 className="font-bold text-lg text-textDark mb-2 flex items-center gap-2">
                                                 💡 Chef Tips & Suggestions
                                             </h4>
-                                            <ul className="space-y-1.5 list-disc pl-5 text-sm text-gray-600 dark:text-gray-400">
+                                            <ul className="space-y-1.5 list-disc pl-5 text-sm text-gray-600">
                                                 {generatedRecipe.tips.map((t, idx) => (
                                                     <li key={idx}>{t}</li>
                                                 ))}
@@ -569,25 +568,25 @@ const AIRecipeStudio = () => {
                                     {/* Nutrition Summary */}
                                     {generatedRecipe.nutrition && (
                                         <div>
-                                            <h4 className="font-bold text-lg text-textDark dark:text-white mb-3">
+                                            <h4 className="font-bold text-lg text-textDark mb-3">
                                                 📊 Nutrition Facts
                                             </h4>
                                             <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                                                <div className="border border-gray-100 dark:border-zinc-700 p-2.5 rounded-xl bg-gray-50/50 dark:bg-zinc-750">
+                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
                                                     <p className="text-gray-400">Protein</p>
-                                                    <p className="font-bold dark:text-white mt-0.5">{generatedRecipe.nutrition.protein || "—"}</p>
+                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.protein || "—"}</p>
                                                 </div>
-                                                <div className="border border-gray-100 dark:border-zinc-700 p-2.5 rounded-xl bg-gray-50/50 dark:bg-zinc-750">
+                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
                                                     <p className="text-gray-400">Carbs</p>
-                                                    <p className="font-bold dark:text-white mt-0.5">{generatedRecipe.nutrition.carbs || "—"}</p>
+                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.carbs || "—"}</p>
                                                 </div>
-                                                <div className="border border-gray-100 dark:border-zinc-700 p-2.5 rounded-xl bg-gray-50/50 dark:bg-zinc-750">
+                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
                                                     <p className="text-gray-400">Fat</p>
-                                                    <p className="font-bold dark:text-white mt-0.5">{generatedRecipe.nutrition.fat || "—"}</p>
+                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.fat || "—"}</p>
                                                 </div>
-                                                <div className="border border-gray-100 dark:border-zinc-700 p-2.5 rounded-xl bg-gray-50/50 dark:bg-zinc-750">
+                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
                                                     <p className="text-gray-400">Fiber</p>
-                                                    <p className="font-bold dark:text-white mt-0.5">{generatedRecipe.nutrition.fiber || "—"}</p>
+                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.fiber || "—"}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -595,9 +594,9 @@ const AIRecipeStudio = () => {
 
                                     {/* Recipe Tags */}
                                     {generatedRecipe.tags?.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 pt-2 border-t dark:border-zinc-750">
+                                        <div className="flex flex-wrap gap-2 pt-2 border-t border-orange-50">
                                             {generatedRecipe.tags.map((t) => (
-                                                <span key={t} className="text-xs bg-gray-100 dark:bg-zinc-700 px-2.5 py-1 rounded-full text-gray-500 dark:text-gray-300">
+                                                <span key={t} className="text-xs bg-gray-100 px-2.5 py-1 rounded-full text-gray-500">
                                                     #{t}
                                                 </span>
                                             ))}
@@ -605,7 +604,7 @@ const AIRecipeStudio = () => {
                                     )}
 
                                     {/* Save Recipe Button */}
-                                    <div className="pt-4 border-t dark:border-zinc-750">
+                                    <div className="pt-4 border-t border-orange-50">
                                         <button
                                             onClick={handleSaveRecipe}
                                             disabled={isCreatingRecipe}
@@ -617,26 +616,26 @@ const AIRecipeStudio = () => {
                                 </div>
                             ) : (
                                 // Creation Success Panel
-                                <div className="bg-white dark:bg-zinc-800 rounded-3xl p-8 shadow-xl border border-orange-100 dark:border-zinc-700 text-center flex flex-col justify-center items-center h-[55vh]">
-                                    <div className="bg-green-50 dark:bg-green-900/20 text-green-500 w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100 dark:border-green-800/30">
+                                <div className="bg-white rounded-3xl p-8 shadow-xl border border-orange-100 text-center flex flex-col justify-center items-center h-[55vh]">
+                                    <div className="bg-green-50 text-green-500 w-16 h-16 rounded-full flex items-center justify-center mb-6 shadow-sm border border-green-100">
                                         <Check size={32} />
                                     </div>
-                                    <h2 className="text-3xl font-extrabold text-textDark dark:text-white mb-2">
+                                    <h2 className="text-3xl font-extrabold text-textDark mb-2">
                                         Recipe Created Successfully! 🎉
                                     </h2>
-                                    <p className="text-gray-400 dark:text-gray-400 max-w-sm text-sm mb-8 leading-relaxed">
+                                    <p className="text-gray-400 max-w-sm text-sm mb-8 leading-relaxed">
                                         Your custom AI-generated recipe is now stored in your cookbook. You can view it or head back home.
                                     </p>
                                     <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
                                         <button
                                             onClick={() => navigate(`/recipe/${createdRecipeId}`)}
-                                            className="flex-1 py-3.5 bg-primary hover:bg-secondary text-white font-bold rounded-xl shadow-sm transition"
+                                            className="w-full sm:flex-1 py-3.5 bg-primary hover:bg-secondary text-white font-bold rounded-xl shadow-sm transition"
                                         >
                                             View Recipe
                                         </button>
                                         <button
                                             onClick={() => navigate("/")}
-                                            className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-700 dark:hover:bg-zinc-650 dark:text-white font-bold rounded-xl shadow-sm transition"
+                                            className="w-full sm:flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl shadow-sm transition"
                                         >
                                             Back Home
                                         </button>
@@ -649,8 +648,8 @@ const AIRecipeStudio = () => {
                         <div className="lg:col-span-4 space-y-6">
                             {/* Variations Panel */}
                             {!successCreated && (
-                                <div className="bg-white dark:bg-zinc-800 rounded-3xl p-5 shadow-xl border border-orange-50/50 dark:border-zinc-700 space-y-4">
-                                    <h4 className="font-extrabold text-sm text-textDark dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                                <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 space-y-4">
+                                    <h4 className="font-extrabold text-sm text-textDark uppercase tracking-wider flex items-center gap-1.5">
                                         🎨 Instant Variations
                                     </h4>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
@@ -659,7 +658,7 @@ const AIRecipeStudio = () => {
                                                 key={v}
                                                 onClick={() => handleVariation(v)}
                                                 disabled={isTyping}
-                                                className="py-2.5 border border-gray-200 dark:border-zinc-700 hover:border-primary dark:hover:border-primary dark:text-gray-300 rounded-xl transition duration-300 font-semibold hover:bg-orange-50/30 dark:hover:bg-primary/10"
+                                                className="py-2.5 border border-gray-200 hover:border-primary text-gray-700 rounded-xl transition duration-300 font-semibold hover:bg-orange-50/30"
                                             >
                                                 {v}
                                             </button>
@@ -670,8 +669,8 @@ const AIRecipeStudio = () => {
 
                             {/* Chat Refiner / Editor */}
                             {!successCreated && (
-                                <div className="bg-white dark:bg-zinc-800 rounded-3xl p-5 shadow-xl border border-orange-50/50 dark:border-zinc-700 space-y-4">
-                                    <h4 className="font-extrabold text-sm text-textDark dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+                                <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 space-y-4">
+                                    <h4 className="font-extrabold text-sm text-textDark uppercase tracking-wider flex items-center gap-1.5">
                                         💬 Conversational Editor
                                     </h4>
                                     <p className="text-xs text-gray-400">
@@ -685,7 +684,7 @@ const AIRecipeStudio = () => {
                                             placeholder="Ask to adjust anything..."
                                             disabled={isTyping}
                                             onKeyDown={(e) => e.key === "Enter" && handleConversationalEdit()}
-                                            className="flex-1 border border-gray-200 dark:border-zinc-700 dark:bg-zinc-750 dark:text-white rounded-xl px-3.5 py-2.5 text-xs outline-none focus:ring-2 focus:ring-primary transition"
+                                            className="flex-1 border border-orange-200 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:ring-2 focus:ring-primary transition bg-orange-50/10 text-textDark"
                                         />
                                         <button
                                             onClick={handleConversationalEdit}
@@ -699,20 +698,20 @@ const AIRecipeStudio = () => {
                                     {/* Mini status indicator */}
                                     {isTyping && (
                                         <div className="flex items-center gap-2 text-xs text-primary font-bold animate-pulse justify-center">
-                                            <RefreshCw size={12} className="animate-spin" /> Adjusting recipe details...
+                                            <RefreshCw size={12} className="animate-spin" /> Adjusting recipe...
                                         </div>
                                     )}
                                 </div>
                             )}
 
                             {/* Chat history logs */}
-                            <div className="bg-white dark:bg-zinc-800 rounded-3xl p-5 shadow-xl border border-orange-50/50 dark:border-zinc-700 max-h-[30vh] overflow-y-auto space-y-2">
+                            <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 max-h-[30vh] overflow-y-auto space-y-2">
                                 <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">
                                     📜 Chat Log
                                 </h4>
                                 <div className="space-y-2">
                                     {messages.map((m, idx) => (
-                                        <div key={idx} className="text-xs leading-relaxed text-gray-500 dark:text-gray-400 border-b pb-2 last:border-b-0 dark:border-zinc-750">
+                                        <div key={idx} className="text-xs leading-relaxed text-gray-500 border-b border-orange-50/30 pb-2 last:border-b-0">
                                             <strong className="capitalize">{m.sender}: </strong> {m.text}
                                         </div>
                                     ))}
