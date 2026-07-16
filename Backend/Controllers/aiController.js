@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-const MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+const MODEL_NAME = "gemini-flash-latest";
 
 const withTimeout = (promise, ms) =>
     Promise.race([
@@ -39,26 +39,15 @@ YES → if the title and description are about a food recipe or dish.
 NO → if they are names of people, places, random words, meaningless text, numbers, greetings, objects, animals, movies, sports, or anything that is not a recipe.
 `;
 
-        let validationResponse = null;
-        for (const model of MODELS) {
-            try {
-                validationResponse = await withTimeout(
-                    ai.models.generateContent({ 
-                        model, 
-                        contents: validationPrompt,
-                        config: { maxOutputTokens: 10 }
-                    }),
-                    15000
-                );
-                break;
-            } catch (err) {
-                console.warn(`[AI Generate] Validation model ${model} failed:`, err.message);
-            }
-        }
-
-        if (!validationResponse) {
-            return res.status(503).json({ message: "AI service unavailable. Please try again." });
-        }
+        console.log(`[AI Generate] Requesting validation using model: ${MODEL_NAME}`);
+        const validationResponse = await withTimeout(
+            ai.models.generateContent({ 
+                model: MODEL_NAME, 
+                contents: validationPrompt,
+                config: { maxOutputTokens: 10 }
+            }),
+            15000
+        );
 
         const validation = validationResponse.text.trim().toUpperCase();
         if (validation !== "YES") {
@@ -89,29 +78,18 @@ Rules:
 }
 `;
 
-        let recipeResponse = null;
-        for (const model of MODELS) {
-            try {
-                recipeResponse = await withTimeout(
-                    ai.models.generateContent({ 
-                        model, 
-                        contents: prompt,
-                        config: { 
-                            responseMimeType: "application/json",
-                            maxOutputTokens: 2048 
-                        }
-                    }),
-                    25000
-                );
-                break;
-            } catch (err) {
-                console.warn(`[AI Generate] Recipe model ${model} failed:`, err.message);
-            }
-        }
-
-        if (!recipeResponse) {
-            return res.status(503).json({ message: "AI service unavailable. Please try again." });
-        }
+        console.log(`[AI Generate] Generating recipe using model: ${MODEL_NAME}`);
+        const recipeResponse = await withTimeout(
+            ai.models.generateContent({ 
+                model: MODEL_NAME, 
+                contents: prompt,
+                config: { 
+                    responseMimeType: "application/json",
+                    maxOutputTokens: 2048 
+                }
+            }),
+            25000
+        );
 
         let text = recipeResponse.text
             .replace(/```json/gi, "")
@@ -121,9 +99,8 @@ Rules:
         const recipe = JSON.parse(text);
         res.status(200).json(recipe);
     } catch (error) {
-        console.error("[AI Generate Error]", error.message);
-        res.status(500).json({ message: "Failed to generate recipe. Please try again." });
+        console.error("[AI Generate Error]", error);
+        res.status(500).json({ message: error.message || "Failed to generate recipe. Please try again." });
     }
 };
-
 module.exports = { generateRecipe };

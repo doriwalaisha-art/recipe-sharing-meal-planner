@@ -1,8 +1,8 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-// Model configuration with gemini-flash-latest as the primary stable model to prevent 404 errors
-const MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+// Single stable model configuration
+const MODEL_NAME = "gemini-flash-latest";
 
 // Timeout wrapper: rejects after ms milliseconds
 const withTimeout = (promise, ms) =>
@@ -13,10 +13,10 @@ const withTimeout = (promise, ms) =>
         ),
     ]);
 
-// Attempt generateContent with a single model
-const attemptGenerate = async (ai, model, prompt) => {
+// Attempt generateContent with the stable model
+const attemptGenerate = async (ai, prompt) => {
     const response = await ai.models.generateContent({
-        model,
+        model: MODEL_NAME,
         contents: prompt,
         config: { 
             responseMimeType: "application/json",
@@ -28,7 +28,6 @@ const attemptGenerate = async (ai, model, prompt) => {
 
 // Parse and validate AI response text
 const parseAIResponse = (text) => {
-    // Strip any accidental markdown fences
     let clean = text
         .replace(/```json/gi, "")
         .replace(/```/g, "")
@@ -41,12 +40,10 @@ const parseAIResponse = (text) => {
         throw new Error("AI returned malformed JSON: " + clean.slice(0, 200));
     }
 
-    // Validate required top-level fields
     if (!result.type || !result.reply || !result.action) {
         throw new Error("AI response missing required fields (type, reply, action)");
     }
 
-    // Ensure recipe object always exists
     if (!result.recipe) {
         result.recipe = {};
     }
@@ -58,7 +55,6 @@ const chatWithAI = async (req, res) => {
     try {
         const { message, recipe } = req.body;
 
-        // --- Input validation ---
         if (!message || typeof message !== "string" || message.trim() === "") {
             return res.status(400).json({
                 success: false,
@@ -76,7 +72,6 @@ const chatWithAI = async (req, res) => {
 
         const ai = new GoogleGenAI({ apiKey });
 
-        // --- Clean recipe: strip large base64 images to avoid token overflow ---
         const cleanRecipe = recipe ? { ...recipe } : {};
         if (
             cleanRecipe.image &&
@@ -91,7 +86,6 @@ const chatWithAI = async (req, res) => {
                 ? JSON.stringify(cleanRecipe)
                 : "Empty";
 
-        // --- Build prompt ---
         const prompt = `
 You are an Expert AI Recipe Assistant and Professional Chef.
 The user is building a recipe through conversation step-by-step.
@@ -151,57 +145,27 @@ Return ONLY valid JSON. No markdown. No \`\`\`json. No explanation outside JSON.
 }
 `;
 
-        // --- Attempt with primary model, fallback to secondary ---
-        let response = null;
-        let lastError = null;
+        console.log(`[AI Chat] Requesting Gemini using model: ${MODEL_NAME}`);
+        const response = await withTimeout(attemptGenerate(ai, prompt), 25000);
+        console.log(`[AI Chat] Generation successful`);
 
-        for (const model of MODELS) {
-            try {
-                console.log(`[AI Chat] Trying model: ${model}`);
-                response = await withTimeout(attemptGenerate(ai, model, prompt), 25000);
-                console.log(`[AI Chat] Success with model: ${model}`);
-                break;
-            } catch (err) {
-                console.warn(`[AI Chat] Model ${model} failed:`, err.message);
-                lastError = err;
-            }
-        }
-
-        if (!response) {
-            throw lastError || new Error("All AI models failed");
-        }
-
-        // --- Parse and validate response ---
         const result = parseAIResponse(response.text);
-
         return res.status(200).json(result);
     } catch (error) {
-        console.error("[AI Chat Error]", {
-            message: error.message,
-            status: error?.status,
-            stack: error?.stack?.split("\n")[0],
-        });
+        console.error("[AI Chat Error]", error);
 
-        const statusCode =
-            error?.status >= 400 && error?.status < 600 ? error.status : 500;
+        const statusCode = error?.status || 500;
+        let errorMessage = error?.message || "AI Chat Failed";
 
-        // Map specific Gemini error codes to user-friendly messages
-        let userMessage = "AI Chat Failed. Please try again.";
         if (error?.status === 429) {
-            userMessage = "AI is busy right now. Please wait a moment and try again.";
+            errorMessage = "AI is busy right now. Please wait a moment and try again.";
         } else if (error?.status === 503) {
-            userMessage = "AI service is temporarily unavailable. Please try again shortly.";
-        } else if (error.message?.includes("timed out")) {
-            userMessage = "AI took too long to respond. Please try again.";
-        } else if (error.message?.includes("malformed JSON")) {
-            userMessage = "AI returned an unexpected response. Please try again.";
-        } else if (error?.status === 404) {
-            userMessage = "AI model not available. Please contact support.";
+            errorMessage = "AI service is temporarily unavailable. Please try again shortly.";
         }
 
-        res.status(statusCode === 429 ? 503 : statusCode).json({
+        res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 500).json({
             success: false,
-            message: userMessage,
+            message: errorMessage
         });
     }
 };
