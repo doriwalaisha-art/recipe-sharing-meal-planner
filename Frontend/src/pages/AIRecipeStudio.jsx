@@ -172,7 +172,8 @@ const AIRecipeStudio = () => {
             }
         } catch (error) {
             console.error(error);
-            toast.error("Failed to generate recipe. Please try again.");
+            const errMsg = error.response?.data?.message || error.message || "Failed to generate recipe.";
+            toast.error(`Generation Error: ${errMsg}`);
             setCurrentStepIndex(STEPS.length - 2); // Go back to instructions step to allow retry
         } finally {
             setIsTyping(false);
@@ -243,7 +244,9 @@ const AIRecipeStudio = () => {
                 ]);
             }
         } catch (error) {
-            toast.error("Failed to edit recipe. Please try again.");
+            console.error(error);
+            const errMsg = error.response?.data?.message || error.message || "Failed to edit recipe.";
+            toast.error(`Edit Error: ${errMsg}`);
         } finally {
             setIsTyping(false);
         }
@@ -265,7 +268,9 @@ const AIRecipeStudio = () => {
                 ]);
             }
         } catch (error) {
-            toast.error("Failed to apply variation.");
+            console.error(error);
+            const errMsg = error.response?.data?.message || error.message || "Failed to apply variation.";
+            toast.error(`Variation Error: ${errMsg}`);
         } finally {
             setIsTyping(false);
         }
@@ -287,7 +292,9 @@ const AIRecipeStudio = () => {
                 ]);
             }
         } catch (error) {
-            toast.error("Failed to regenerate.");
+            console.error(error);
+            const errMsg = error.response?.data?.message || error.message || "Failed to regenerate.";
+            toast.error(`Regenerate Error: ${errMsg}`);
         } finally {
             setIsTyping(false);
         }
