@@ -11,7 +11,6 @@ import RecipeEdit from './pages/RecipeEdit';
 import Profile from './pages/profile';
 import EditProfile from './pages/EditProfile';
 import MealPlanner from './pages/MealPlanner';
-import AIRecipeStudio from './pages/AIRecipeStudio';
 
 import { useSelector } from 'react-redux';
 
@@ -38,7 +37,6 @@ function App() {
                 <Route path="/profile/:id" element={isAuthenticated ? <Profile/> : <Navigate to="/login" />} />
                 <Route path="/profile/edit" element={isAuthenticated ? <EditProfile/> : <Navigate to="/login"/>}/>
                 <Route path="/mealplanner" element={isAuthenticated ? <MealPlanner/> : <Navigate to = "/login"/>}/>
-                <Route path="/ai-recipe-studio" element={isAuthenticated ? <AIRecipeStudio /> :  <Navigate to = "/login"/> }/>
                 
                 <Route path="*" element={<Navigate to="/" />} />
 

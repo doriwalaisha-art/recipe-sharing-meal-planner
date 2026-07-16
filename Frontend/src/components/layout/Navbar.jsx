@@ -28,7 +28,6 @@ const Navbar = () => {
                     <Link to="/" className="text-gray-600 hover:text-primary font-medium transition-colors">Home</Link>
                     <Link to="/recipe/create" className="text-gray-600 hover:text-primary font-medium transition-colors">Create Recipe</Link>
                     <Link to="/mealplanner" className="text-gray-600 hover:text-primary font-medium transition-colors">Meal Planner</Link>
-                    <Link to="/ai-recipe-studio" className="text-gray-600 hover:text-primary font-medium transition-colors">✨ AI Recipe Studio</Link>
 
                     {isAuthenticated && (
                         <div className="flex items-center gap-6 ml-4 pl-6 border-l border-gray-200">
@@ -64,7 +63,6 @@ const Navbar = () => {
                     <Link to="/" onClick={() => setIsOpen(false)} className="text-gray-600 font-semibold text-lg hover:text-primary transition-colors py-1">Home</Link>
                     <Link to="/recipe/create" onClick={() => setIsOpen(false)} className="text-gray-600 font-semibold text-lg hover:text-primary transition-colors py-1">Create Recipe</Link>
                     <Link to="/mealplanner" onClick={() => setIsOpen(false)} className="text-gray-600 font-semibold text-lg hover:text-primary transition-colors py-1">Meal Planner</Link>
-                    <Link to="/ai-recipe-studio" onClick={() => setIsOpen(false)} className="text-gray-600 font-semibold text-lg hover:text-primary transition-colors py-1">✨ AI Recipe Studio</Link>
                     {isAuthenticated && (
                         <>
                             <Link 
