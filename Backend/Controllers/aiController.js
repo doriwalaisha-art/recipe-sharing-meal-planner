@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-const MODELS = ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+const MODELS = ["gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
 const withTimeout = (promise, ms) =>
     Promise.race([
@@ -43,7 +43,11 @@ NO → if they are names of people, places, random words, meaningless text, numb
         for (const model of MODELS) {
             try {
                 validationResponse = await withTimeout(
-                    ai.models.generateContent({ model, contents: validationPrompt }),
+                    ai.models.generateContent({ 
+                        model, 
+                        contents: validationPrompt,
+                        config: { maxOutputTokens: 10 }
+                    }),
                     15000
                 );
                 break;
@@ -89,7 +93,14 @@ Rules:
         for (const model of MODELS) {
             try {
                 recipeResponse = await withTimeout(
-                    ai.models.generateContent({ model, contents: prompt }),
+                    ai.models.generateContent({ 
+                        model, 
+                        contents: prompt,
+                        config: { 
+                            responseMimeType: "application/json",
+                            maxOutputTokens: 2048 
+                        }
+                    }),
                     25000
                 );
                 break;
