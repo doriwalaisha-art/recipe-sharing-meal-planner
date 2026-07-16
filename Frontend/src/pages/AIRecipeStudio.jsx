@@ -6,14 +6,10 @@ import { useNavigate } from "react-router-dom";
 
 const STEPS = [
     { key: "title", question: "What is the name of the recipe you want to create?", placeholder: "e.g., Paneer Butter Masala", chips: ["Butter Chicken", "Masala Dosa", "Veg Biryani", "Pasta Carbonara"] },
-    { key: "foodType", question: "What type of food is this?", chips: ["Veg", "Non-Veg", "Vegan", "Jain"] },
-    { key: "category", question: "Which meal category does it belong to?", chips: ["Breakfast", "Lunch", "Dinner", "Snacks", "Dessert"] },
-    { key: "cuisine", question: "What is the cuisine?", chips: ["Indian", "Italian", "Chinese", "Mexican", "Thai"] },
+    { key: "category", question: "Select the Category for your recipe:", chips: ['Breakfast','Brunch','Lunch','Snacks','Dinner','Dessert','Beverages','Salad','Soup','Vegetarian','Non-Vegetarian','Vegan','Healthy','High-Protein','Quick Meals','Jain'] },
     { key: "cookingTime", question: "What is the estimated cooking time (in minutes)?", placeholder: "e.g., 30", chips: ["15", "30", "45", "60"] },
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
-    { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
-    { key: "spiceLevel", question: "What is the spice level?", chips: ["Mild", "Medium", "Hot", "Extra Hot"] },
-    { key: "notes", question: "Any special notes, diet restrictions, or preferences? (or write 'None')", placeholder: "e.g., Gluten-free, extra garlic...", chips: ["None", "Gluten-free", "Dairy-free", "Less oil"] }
+    { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] }
 ];
 
 const LOADING_MESSAGES = [
@@ -41,8 +37,7 @@ const AIRecipeStudio = () => {
     const [recipeDraft, setRecipeDraft] = useState(() => {
         const saved = localStorage.getItem("ai_studio_draft");
         return saved ? JSON.parse(saved) : {
-            title: "", foodType: "", category: "", cuisine: "",
-            cookingTime: "", servings: "", difficulty: "", spiceLevel: "", notes: ""
+            title: "", category: "", cookingTime: "", servings: "", difficulty: ""
         };
     });
     const [messages, setMessages] = useState(() => {
@@ -181,8 +176,7 @@ const AIRecipeStudio = () => {
             setStarted(false);
             setCurrentStepIndex(0);
             setRecipeDraft({
-                title: "", foodType: "", category: "", cuisine: "",
-                cookingTime: "", servings: "", difficulty: "", spiceLevel: "", notes: ""
+                title: "", category: "", cookingTime: "", servings: "", difficulty: ""
             });
             setMessages([
                 { sender: "ai", text: "🤖 Welcome to AI Recipe Studio! I will guide you step-by-step to create a premium recipe. Let's start! What is the name of your dish?" }
@@ -471,7 +465,7 @@ const AIRecipeStudio = () => {
                                     <div className="flex justify-between items-start border-b pb-4">
                                         <div>
                                             <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wider">
-                                                {generatedRecipe.difficulty} • {recipeDraft.foodType || "Veg"}
+                                                {generatedRecipe.difficulty} • {recipeDraft.category || "Dinner"}
                                             </span>
                                             <h2 className="text-3xl font-extrabold text-textDark mt-2">
                                                 {generatedRecipe.title}
