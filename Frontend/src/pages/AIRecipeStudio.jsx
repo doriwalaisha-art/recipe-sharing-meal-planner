@@ -6,10 +6,13 @@ import { useNavigate } from "react-router-dom";
 
 const STEPS = [
     { key: "title", question: "What is the name of the recipe you want to create?", placeholder: "e.g., Paneer Butter Masala", chips: ["Butter Chicken", "Masala Dosa", "Veg Biryani", "Pasta Carbonara"] },
+    { key: "description", question: "Describe this recipe, or let me generate a description for you:", placeholder: "Enter a brief description...", chips: ["Generate Description"] },
     { key: "category", question: "Select the Category for your recipe:", chips: ['Breakfast','Brunch','Lunch','Snacks','Dinner','Dessert','Beverages','Salad','Soup','Vegetarian','Non-Vegetarian','Vegan','Healthy','High-Protein','Quick Meals','Jain'] },
     { key: "cookingTime", question: "What is the estimated cooking time (in minutes)?", placeholder: "e.g., 30", chips: ["15", "30", "45", "60"] },
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
-    { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] }
+    { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
+    { key: "ingredients", question: "Provide the list of ingredients (separated by commas), or let me generate them:", placeholder: "e.g., 200g Paneer, 2 tomatoes, 1 onion...", chips: ["Generate Ingredients"] },
+    { key: "instructions", question: "Provide step-by-step instructions (separated by commas or dots), or let me generate them:", placeholder: "e.g., Cut paneer, Saute tomatoes, Add spices...", chips: ["Generate Instructions"] }
 ];
 
 const LOADING_MESSAGES = [
@@ -37,7 +40,7 @@ const AIRecipeStudio = () => {
     const [recipeDraft, setRecipeDraft] = useState(() => {
         const saved = localStorage.getItem("ai_studio_draft");
         return saved ? JSON.parse(saved) : {
-            title: "", category: "", cookingTime: "", servings: "", difficulty: ""
+            title: "", description: "", category: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
         };
     });
     const [messages, setMessages] = useState(() => {
@@ -103,13 +106,29 @@ const AIRecipeStudio = () => {
         const text = val || inputText;
         if (!text.trim()) return;
 
-        // User message
-        const updatedMessages = [...messages, { sender: "user", text }];
+        // User message representation
+        let userMessageText = text;
+        let valueToSave = text;
+
+        const currentStep = STEPS[currentStepIndex];
+
+        // Format specific choice chip placeholders
+        if (text === "Generate Description") {
+            userMessageText = "Please generate the description for me.";
+            valueToSave = "__generate__";
+        } else if (text === "Generate Ingredients") {
+            userMessageText = "Please generate the ingredients for me.";
+            valueToSave = "__generate__";
+        } else if (text === "Generate Instructions") {
+            userMessageText = "Please generate the instructions for me.";
+            valueToSave = "__generate__";
+        }
+
+        const updatedMessages = [...messages, { sender: "user", text: userMessageText }];
         setMessages(updatedMessages);
         setInputText("");
 
-        const currentStep = STEPS[currentStepIndex];
-        const nextDraft = { ...recipeDraft, [currentStep.key]: text };
+        const nextDraft = { ...recipeDraft, [currentStep.key]: valueToSave };
         setRecipeDraft(nextDraft);
 
         if (currentStepIndex < STEPS.length - 1) {
@@ -176,7 +195,7 @@ const AIRecipeStudio = () => {
             setStarted(false);
             setCurrentStepIndex(0);
             setRecipeDraft({
-                title: "", category: "", cookingTime: "", servings: "", difficulty: ""
+                title: "", description: "", category: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
             });
             setMessages([
                 { sender: "ai", text: "🤖 Welcome to AI Recipe Studio! I will guide you step-by-step to create a premium recipe. Let's start! What is the name of your dish?" }

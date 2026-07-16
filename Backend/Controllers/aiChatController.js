@@ -42,26 +42,29 @@ Your task is to take the following recipe draft details and generate a complete,
 Recipe Draft Details:
 ${JSON.stringify(recipeDraft, null, 2)}
 
+Strict Rules:
+1. If description is "__generate__", generate an appetizing and professional description. Otherwise, use the user's exact description.
+2. If ingredients is "__generate__", generate a realistic and complete list of ingredients with measurements. Otherwise, parse the user's ingredient text into a clean array of strings (split by commas/newlines and format them nicely).
+3. If instructions is "__generate__", generate clear, step-by-step cooking steps. Otherwise, parse the user's instructions text into a clean array of step strings (split by commas/steps/dots and format them nicely).
+
 Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
 
 {
   "title": "Clean Title of the Recipe",
-  "description": "Short, engaging, appetizing description of the dish.",
+  "description": "Appetizing description.",
   "cookingTime": ${recipeDraft.cookingTime ? parseInt(recipeDraft.cookingTime) : 30},
   "servings": ${recipeDraft.servings ? parseInt(recipeDraft.servings) : 2},
   "difficulty": "${recipeDraft.difficulty || "Medium"}",
   "estimatedCalories": 350,
   "ingredients": [
-    "exact quantity and ingredient (e.g. 2 cups Basmati Rice)",
-    "exact quantity and ingredient"
+    "exact quantity and ingredient (e.g. 2 cups Basmati Rice)"
   ],
   "instructions": [
     "Step-by-step instruction 1",
     "Step-by-step instruction 2"
   ],
   "tips": [
-    "Chef tip 1",
-    "Chef tip 2"
+    "Chef tip 1"
   ],
   "nutrition": {
     "protein": "15g",
@@ -83,7 +86,7 @@ ${JSON.stringify(currentRecipe, null, 2)}
 User Instruction:
 "${instruction}"
 
-Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
+Strictly output ONLY valid JSON matching this schema.
 
 {
   "title": "Clean Title",
@@ -93,21 +96,21 @@ Strictly output ONLY valid JSON matching this schema. Do not output any other te
   "difficulty": "Medium",
   "estimatedCalories": 350,
   "ingredients": [
-    "ingredient list updated according to the instruction"
+    "ingredients list"
   ],
   "instructions": [
-    "instructions list updated according to the instruction"
+    "instructions list"
   ],
   "tips": [
-    "tips updated according to the instruction"
+    "tips list"
   ],
   "nutrition": {
-    "protein": "updated value",
-    "carbs": "updated value",
-    "fat": "updated value",
-    "fiber": "updated value"
+    "protein": "protein value",
+    "carbs": "carbs value",
+    "fat": "fat value",
+    "fiber": "fiber value"
   },
-  "tags": ["updated tags"]
+  "tags": ["tags"]
 }
 `;
         } else if (action === "variation") {
@@ -118,31 +121,31 @@ Adjust ingredients, instructions, tips, and nutrition fields appropriately.
 Current Recipe:
 ${JSON.stringify(currentRecipe, null, 2)}
 
-Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
+Strictly output ONLY valid JSON matching this schema.
 
 {
-  "title": "New Title representing the variation (e.g. Dhaba Style Paneer)",
-  "description": "Appetizing description for this variation.",
+  "title": "New Title",
+  "description": "Description",
   "cookingTime": 30,
   "servings": 2,
   "difficulty": "Medium",
   "estimatedCalories": 350,
   "ingredients": [
-    "ingredient list adapted for the variation"
+    "adapted ingredients"
   ],
   "instructions": [
-    "instructions Adapted for the variation"
+    "adapted instructions"
   ],
   "tips": [
-    "tips tailored for the variation"
+    "adapted tips"
   ],
   "nutrition": {
-    "protein": "updated value",
-    "carbs": "updated value",
-    "fat": "updated value",
-    "fiber": "updated value"
+    "protein": "protein",
+    "carbs": "carbs",
+    "fat": "fat",
+    "fiber": "fiber"
   },
-  "tags": ["updated tags"]
+  "tags": ["tags"]
 }
 `;
         } else if (action === "regenerate_field") {
@@ -164,19 +167,19 @@ Strictly output ONLY valid JSON matching the full recipe schema.
   "difficulty": "Medium",
   "estimatedCalories": 350,
   "ingredients": [
-    "ingredients list"
+    "ingredients"
   ],
   "instructions": [
-    "instructions list"
+    "instructions"
   ],
   "tips": [
-    "tips list"
+    "tips"
   ],
   "nutrition": {
-    "protein": "value",
-    "carbs": "value",
-    "fat": "value",
-    "fiber": "value"
+    "protein": "protein",
+    "carbs": "carbs",
+    "fat": "fat",
+    "fiber": "fiber"
   },
   "tags": ["tags"]
 }
