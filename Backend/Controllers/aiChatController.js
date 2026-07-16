@@ -1,8 +1,8 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-// Model priority list — tested and confirmed working with current API keys
-const MODELS = ["gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+// Model configuration with gemini-2.5-flash as primary and gemini-2.5-pro as fallback
+const MODELS = ["gemini-2.5-flash", "gemini-2.5-pro"];
 
 // Timeout wrapper: rejects after ms milliseconds
 const withTimeout = (promise, ms) =>
