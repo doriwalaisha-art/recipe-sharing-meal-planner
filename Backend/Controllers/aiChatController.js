@@ -1,6 +1,9 @@
 const { GoogleGenAI } = require("@google/genai");
 
-const MODEL_NAME = "gemini-flash-latest";
+let CURRENT_MODEL = "gemini-2.5-flash";
+
+// Global in-memory cache for session-based recipe draft deduplication
+const recipeCache = new Map();
 
 const withTimeout = (promise, ms) =>
     Promise.race([
@@ -10,21 +13,50 @@ const withTimeout = (promise, ms) =>
         ),
     ]);
 
-// Attempt generateContent with the stable model
-const attemptGenerate = async (ai, prompt) => {
-    const response = await ai.models.generateContent({
-        model: MODEL_NAME,
-        contents: prompt,
-        config: { 
-            responseMimeType: "application/json",
-            maxOutputTokens: 2048
-        },
-    });
-    return response;
+// Helper to clean Markdown wrapper
+const parseJSONResponse = (text) => {
+    let clean = text
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+    return JSON.parse(clean);
 };
 
-// Auto-retry helper for 429 rate limits
-const attemptGenerateWithRetry = async (ai, prompt, retries = 3) => {
+// Validate Gemini JSON schema
+const isValidRecipeJSON = (obj) => {
+    return obj && 
+           typeof obj.description === "string" &&
+           Array.isArray(obj.ingredients) &&
+           Array.isArray(obj.instructions) &&
+           Array.isArray(obj.tips) &&
+           typeof obj.nutrition === "object" &&
+           Array.isArray(obj.tags);
+};
+
+// Attempt generateContent with dynamic fallback to gemini-flash-latest on 404
+const attemptGenerate = async (ai, prompt) => {
+    try {
+        const response = await ai.models.generateContent({
+            model: CURRENT_MODEL,
+            contents: prompt,
+            config: { 
+                responseMimeType: "application/json",
+                maxOutputTokens: 2048
+            },
+        });
+        return response;
+    } catch (error) {
+        if (error.status === 404 && CURRENT_MODEL === "gemini-2.5-flash") {
+            console.warn("[AI Chat] gemini-2.5-flash not available (404). Falling back to gemini-flash-latest...");
+            CURRENT_MODEL = "gemini-flash-latest";
+            return attemptGenerate(ai, prompt);
+        }
+        throw error;
+    }
+};
+
+// Auto-retry helper for 429 rate limits with exponential backoff (1st retry: 2s, 2nd retry: 5s)
+const attemptGenerateWithRetry = async (ai, prompt, retries = 2, delayMs = 2000) => {
     try {
         const response = await withTimeout(attemptGenerate(ai, prompt), 25000);
         return response;
@@ -35,28 +67,13 @@ const attemptGenerateWithRetry = async (ai, prompt, retries = 3) => {
                             error.message?.toLowerCase().includes("exhausted");
 
         if (isRateLimit && retries > 0) {
-            // Parse retry delay from error message, e.g. "Please retry in 19.74s" or "retryDelay: 19s"
-            let waitMs = 15000; // Default fallback to 15 seconds
-            const match = error.message?.match(/retry in\s+(\d+(\.\d+)?)/i) || error.message?.match(/retryDelay":\s*"(\d+)/i);
-            if (match) {
-                const parsedSec = parseFloat(match[1]);
-                waitMs = Math.ceil(parsedSec) * 1000 + 1500; // Add 1.5 second safety buffer
-            }
-            console.warn(`[AI Chat] Rate limited. Waiting ${waitMs / 1000}s before retrying... (${retries} attempts left). Error details: ${error.message}`);
-            await new Promise(resolve => setTimeout(resolve, waitMs));
-            return attemptGenerateWithRetry(ai, prompt, retries - 1);
+            const nextDelay = retries === 2 ? 5000 : 10000;
+            console.warn(`[AI Chat] Rate limited. Retrying in ${delayMs / 1000}s... (${retries} attempts left)`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            return attemptGenerateWithRetry(ai, prompt, retries - 1, nextDelay);
         }
         throw error;
     }
-};
-
-// Helper to clean Markdown wrapper
-const parseJSONResponse = (text) => {
-    let clean = text
-        .replace(/```json/gi, "")
-        .replace(/```/g, "")
-        .trim();
-    return JSON.parse(clean);
 };
 
 const chatWithAI = async (req, res) => {
@@ -71,31 +88,44 @@ const chatWithAI = async (req, res) => {
             });
         }
 
+        // Cache lookup for generate action
+        let cacheKey = "";
+        if (action === "generate" && recipeDraft) {
+            cacheKey = JSON.stringify(recipeDraft);
+            if (recipeCache.has(cacheKey)) {
+                console.log("[AI Chat] Serving recipe from in-memory cache");
+                return res.status(200).json({ success: true, recipe: recipeCache.get(cacheKey) });
+            }
+        }
+
         const ai = new GoogleGenAI({ apiKey });
         let prompt = "";
 
         if (action === "generate") {
             prompt = `
 You are a Professional Chef and AI Recipe Generator.
-Your task is to take the following recipe draft details and generate a complete, high-quality, professional food recipe.
+Generate a complete, high-quality recipe matching the details below.
 
-Recipe Draft Details:
-${JSON.stringify(recipeDraft, null, 2)}
+Recipe Details:
+- Title: ${recipeDraft.title}
+- Food Type: ${recipeDraft.foodType || "Veg"}
+- Category: ${recipeDraft.category || "Dinner"}
+- Cuisine: ${recipeDraft.cuisine || "Indian"}
+- Cooking Time: ${recipeDraft.cookingTime || "30"} minutes
+- Servings: ${recipeDraft.servings || "2"}
+- Difficulty: ${recipeDraft.difficulty || "Medium"}
+- Spice Level: ${recipeDraft.spiceLevel || "Medium"}
+- Special Notes: ${recipeDraft.notes || "None"}
 
-Strict Rules:
-1. If description is "__generate__", generate an appetizing and professional description. Otherwise, use the user's exact description.
-2. If ingredients is "__generate__", generate a realistic and complete list of ingredients with measurements. Otherwise, parse the user's ingredient text into a clean array of strings (split by commas/newlines and format them nicely).
-3. If instructions is "__generate__", generate clear, step-by-step cooking steps. Otherwise, parse the user's instructions text into a clean array of step strings (split by commas/steps/dots and format them nicely).
-
-Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
-
+Strictly return ONLY a valid JSON object. No explanations. No markdown formatting.
+JSON schema:
 {
-  "title": "Clean Title of the Recipe",
+  "title": "${recipeDraft.title}",
   "description": "Appetizing description.",
   "cookingTime": ${recipeDraft.cookingTime ? parseInt(recipeDraft.cookingTime) : 30},
   "servings": ${recipeDraft.servings ? parseInt(recipeDraft.servings) : 2},
   "difficulty": "${recipeDraft.difficulty || "Medium"}",
-  "estimatedCalories": 350,
+  "estimatedCalories": "350 kcal",
   "ingredients": [
     "exact quantity and ingredient (e.g. 2 cups Basmati Rice)"
   ],
@@ -117,8 +147,7 @@ Strictly output ONLY valid JSON matching this schema. Do not output any other te
 `;
         } else if (action === "edit") {
             prompt = `
-You are a Professional Chef. Modifying an existing recipe based on the user's instruction.
-Modify ONLY the necessary parts of the recipe based on the instruction. Preserve the other parts.
+You are a Professional Chef. Modify the existing recipe based on the user's instruction. Preserve other parts.
 
 Current Recipe:
 ${JSON.stringify(currentRecipe, null, 2)}
@@ -126,119 +155,78 @@ ${JSON.stringify(currentRecipe, null, 2)}
 User Instruction:
 "${instruction}"
 
-Strictly output ONLY valid JSON matching this schema.
-
-{
-  "title": "Clean Title",
-  "description": "Appetizing description.",
-  "cookingTime": 30,
-  "servings": 2,
-  "difficulty": "Medium",
-  "estimatedCalories": 350,
-  "ingredients": [
-    "ingredients list"
-  ],
-  "instructions": [
-    "instructions list"
-  ],
-  "tips": [
-    "tips list"
-  ],
-  "nutrition": {
-    "protein": "protein value",
-    "carbs": "carbs value",
-    "fat": "fat value",
-    "fiber": "fiber value"
-  },
-  "tags": ["tags"]
-}
+Strictly return ONLY a valid JSON object matching the recipe schema.
 `;
         } else if (action === "variation") {
             prompt = `
-You are a Professional Chef. Convert the following recipe into a "${variation}" variation (e.g., Jain style, Dhaba Style, High Protein, Healthy, Low Oil, Restaurant Style).
-Adjust ingredients, instructions, tips, and nutrition fields appropriately.
+You are a Professional Chef. Convert the following recipe into a "${variation}" variation.
 
 Current Recipe:
 ${JSON.stringify(currentRecipe, null, 2)}
 
-Strictly output ONLY valid JSON matching this schema.
-
-{
-  "title": "New Title",
-  "description": "Description",
-  "cookingTime": 30,
-  "servings": 2,
-  "difficulty": "Medium",
-  "estimatedCalories": 350,
-  "ingredients": [
-    "adapted ingredients"
-  ],
-  "instructions": [
-    "adapted instructions"
-  ],
-  "tips": [
-    "adapted tips"
-  ],
-  "nutrition": {
-    "protein": "protein",
-    "carbs": "carbs",
-    "fat": "fat",
-    "fiber": "fiber"
-  },
-  "tags": ["tags"]
-}
+Strictly return ONLY a valid JSON object matching the recipe schema.
 `;
         } else if (action === "regenerate_field") {
             prompt = `
-You are a Professional Chef. You need to regenerate ONLY the field "${fieldToRegenerate}" (which can be either "ingredients", "instructions", or "entire") for the current recipe.
-If it is "entire", completely regenerate a fresh version of the recipe.
-If it is "ingredients" or "instructions", improve or vary that specific array while keeping the rest of the recipe the same.
+You are a Professional Chef. Regenerate ONLY the field "${fieldToRegenerate}" (ingredients, instructions, or entire) for the current recipe.
 
 Current Recipe:
 ${JSON.stringify(currentRecipe, null, 2)}
 
-Strictly output ONLY valid JSON matching the full recipe schema.
-
-{
-  "title": "Title",
-  "description": "Description",
-  "cookingTime": 30,
-  "servings": 2,
-  "difficulty": "Medium",
-  "estimatedCalories": 350,
-  "ingredients": [
-    "ingredients"
-  ],
-  "instructions": [
-    "instructions"
-  ],
-  "tips": [
-    "tips"
-  ],
-  "nutrition": {
-    "protein": "protein",
-    "carbs": "carbs",
-    "fat": "fat",
-    "fiber": "fiber"
-  },
-  "tags": ["tags"]
-}
+Strictly return ONLY a valid JSON object matching the recipe schema.
 `;
         } else {
             return res.status(400).json({ success: false, message: "Invalid action type." });
         }
 
-        console.log(`[AI Chat] Requesting Gemini using model: ${MODEL_NAME}`);
-        const response = await attemptGenerateWithRetry(ai, prompt);
+        console.log(`[AI Chat] Requesting Gemini using model: ${CURRENT_MODEL}`);
+        let response = await attemptGenerateWithRetry(ai, prompt);
         console.log(`[AI Chat] Generation successful`);
-        const result = parseJSONResponse(response.text);
+        
+        let result;
+        try {
+            result = parseJSONResponse(response.text);
+        } catch (parseErr) {
+            console.warn("[AI Chat] Failed to parse JSON response. Attempting one automatic regeneration...");
+            response = await attemptGenerateWithRetry(ai, prompt + "\nStrictly output valid JSON. Fix any JSON formatting errors.");
+            result = parseJSONResponse(response.text);
+        }
+
+        // Validate recipe JSON schema (only for generation)
+        if (action === "generate" && !isValidRecipeJSON(result)) {
+            console.warn("[AI Chat] Invalid recipe JSON schema. Attempting one automatic regeneration...");
+            response = await attemptGenerateWithRetry(ai, prompt + "\nYour previous response was missing critical JSON fields. Please include all fields (description, ingredients, instructions, tips, nutrition, estimatedCalories, tags) properly.");
+            result = parseJSONResponse(response.text);
+            if (!isValidRecipeJSON(result)) {
+                throw new Error("Generated recipe JSON did not match required schema.");
+            }
+        }
+
+        // Store result in cache
+        if (action === "generate" && cacheKey) {
+            recipeCache.set(cacheKey, result);
+        }
+
         return res.status(200).json({ success: true, recipe: result });
 
     } catch (error) {
         console.error("[AI Chat Studio Error]", error);
+
+        const isRateLimit = error.status === 429 || 
+                            error.message?.toLowerCase().includes("quota") || 
+                            error.message?.toLowerCase().includes("limit") ||
+                            error.message?.toLowerCase().includes("exhausted");
+
+        if (isRateLimit) {
+            return res.status(429).json({
+                success: false,
+                error: "AI service is temporarily unavailable. Please try again later."
+            });
+        }
+
         return res.status(500).json({
             success: false,
-            message: error.message || "Failed to process AI chat request."
+            error: "Failed to process AI chat request. Please try again."
         });
     }
 };

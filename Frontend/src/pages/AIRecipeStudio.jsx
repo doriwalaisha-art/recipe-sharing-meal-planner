@@ -6,14 +6,15 @@ import { useNavigate } from "react-router-dom";
 
 const STEPS = [
     { key: "title", question: "What is the name of the recipe you want to create?", placeholder: "e.g., Paneer Butter Masala", chips: ["Butter Chicken", "Masala Dosa", "Veg Biryani", "Pasta Carbonara"] },
-    { key: "description", question: "Describe this recipe, or let me generate a description for you:", placeholder: "Enter a brief description...", chips: ["Generate Description"] },
+    { key: "foodType", question: "What is the food type?", chips: ["Veg", "Non-Veg", "Vegan", "Jain"] },
     { key: "category", question: "Select the Category for your recipe:", chips: ['Breakfast','Brunch','Lunch','Snacks','Dinner','Dessert','Beverages','Salad','Soup','Vegetarian','Non-Vegetarian','Vegan','Healthy','High-Protein','Quick Meals','Jain'] },
+    { key: "cuisine", question: "What is the cuisine?", chips: ["Indian", "Italian", "Chinese", "Mexican", "Thai", "Mediterranean"] },
     { key: "cookingTime", question: "What is the estimated cooking time (in minutes)?", placeholder: "e.g., 30", chips: ["15", "30", "45", "60"] },
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
     { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
-    { key: "ingredients", question: "Provide the list of ingredients (separated by commas), or let me generate them:", placeholder: "e.g., 200g Paneer, 2 tomatoes, 1 onion...", chips: ["Generate Ingredients"] },
-    { key: "instructions", question: "Provide step-by-step instructions (separated by commas or dots), or let me generate them:", placeholder: "e.g., Cut paneer, Saute tomatoes, Add spices...", chips: ["Generate Instructions"] },
-    { key: "image", question: "Please upload an image for your recipe:", chips: [] } // Image upload step
+    { key: "spiceLevel", question: "Select the spice level:", chips: ["Mild", "Medium", "Hot", "Extra Hot"] },
+    { key: "notes", question: "Any special notes or dietary preferences?", placeholder: "e.g., Gluten-free, Low-fat, Extra garlic... (or write 'None')", chips: ["None", "Gluten-free", "Dairy-free", "Low calorie"] },
+    { key: "image", question: "Please upload an image for your recipe:", chips: [] } // Step 10: Image upload
 ];
 
 const LOADING_MESSAGES = [
@@ -39,7 +40,7 @@ const AIRecipeStudio = () => {
     const [recipeDraft, setRecipeDraft] = useState(() => {
         const saved = localStorage.getItem("ai_studio_draft");
         return saved ? JSON.parse(saved) : {
-            title: "", description: "", category: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
+            title: "", foodType: "", category: "", cuisine: "", cookingTime: "", servings: "", difficulty: "", spiceLevel: "", notes: ""
         };
     });
     const [messages, setMessages] = useState(() => {
@@ -106,27 +107,13 @@ const AIRecipeStudio = () => {
         const text = val || inputText;
         if (!text.trim()) return;
 
-        let userMessageText = text;
-        let valueToSave = text;
-
         const currentStep = STEPS[currentStepIndex];
 
-        if (text === "Generate Description") {
-            userMessageText = "Please generate the description for me.";
-            valueToSave = "__generate__";
-        } else if (text === "Generate Ingredients") {
-            userMessageText = "Please generate the ingredients for me.";
-            valueToSave = "__generate__";
-        } else if (text === "Generate Instructions") {
-            userMessageText = "Please generate the instructions for me.";
-            valueToSave = "__generate__";
-        }
-
-        const updatedMessages = [...messages, { sender: "user", text: userMessageText }];
+        const updatedMessages = [...messages, { sender: "user", text }];
         setMessages(updatedMessages);
         setInputText("");
 
-        const nextDraft = { ...recipeDraft, [currentStep.key]: valueToSave };
+        const nextDraft = { ...recipeDraft, [currentStep.key]: text };
         setRecipeDraft(nextDraft);
 
         if (currentStepIndex < STEPS.length - 1) {
@@ -172,7 +159,7 @@ const AIRecipeStudio = () => {
             }
         } catch (error) {
             console.error(error);
-            const errMsg = error.response?.data?.message || error.message || "Failed to generate recipe.";
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to generate recipe.";
             toast.error(`Generation Error: ${errMsg}`);
             setCurrentStepIndex(STEPS.length - 2); // Go back to instructions step to allow retry
         } finally {
@@ -210,7 +197,7 @@ const AIRecipeStudio = () => {
             setStarted(false);
             setCurrentStepIndex(0);
             setRecipeDraft({
-                title: "", description: "", category: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
+                title: "", foodType: "", category: "", cuisine: "", cookingTime: "", servings: "", difficulty: "", spiceLevel: "", notes: ""
             });
             setSelectedImage(null);
             setMessages([
@@ -245,7 +232,7 @@ const AIRecipeStudio = () => {
             }
         } catch (error) {
             console.error(error);
-            const errMsg = error.response?.data?.message || error.message || "Failed to edit recipe.";
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to edit recipe.";
             toast.error(`Edit Error: ${errMsg}`);
         } finally {
             setIsTyping(false);
@@ -269,7 +256,7 @@ const AIRecipeStudio = () => {
             }
         } catch (error) {
             console.error(error);
-            const errMsg = error.response?.data?.message || error.message || "Failed to apply variation.";
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to apply variation.";
             toast.error(`Variation Error: ${errMsg}`);
         } finally {
             setIsTyping(false);
@@ -293,7 +280,7 @@ const AIRecipeStudio = () => {
             }
         } catch (error) {
             console.error(error);
-            const errMsg = error.response?.data?.message || error.message || "Failed to regenerate.";
+            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to regenerate.";
             toast.error(`Regenerate Error: ${errMsg}`);
         } finally {
             setIsTyping(false);
