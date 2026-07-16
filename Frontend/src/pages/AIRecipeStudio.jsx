@@ -15,26 +15,50 @@ const AIRecipeStudio = () => {
     ]);
     const [recipe, setRecipe] = useState(null);
     const [isTyping, setIsTyping] = useState(false); 
-    const [categories, setCategories] = useState([]);
-
     const [selectedCategory, setSelectedCategory] = useState("");
-
+    const [selectedDifficulty, setSelectedDifficulty] = useState("");
     const [selectedImage, setSelectedImage] = useState(null);
+    const categories = [
+        { _id: 1, name: "Breakfast" },
+        { _id: 2, name: "Lunch" },
+        { _id: 3, name: "Dinner" },
+        { _id: 4, name: "Dessert" },
+        { _id: 5, name: "Snack" },
+    ];
+    const difficulties = [
+        { _id: 1, name: "Easy" },
+        { _id: 2, name: "Medium" },
+        { _id: 3, name: "Hard" },
+    ];
 
-    useEffect(() => {
-    fetchCategories();
-}, []);
-
-const fetchCategories = async () => {
-    const { data } = await API.get("/categories");
-    setCategories(data);
-};
     const navigate = useNavigate();   
 
         const handleCreateRecipe = async () => {
     try {
+        const formData = new FormData();
+        formData.append('title', recipe.title);
+        formData.append('description', recipe.description || "A delicious recipe created with AI.");
+        formData.append('category', recipe.category || "Dinner");
+        formData.append('difficulty', recipe.difficulty || "Medium");
+        
+        let time = recipe.cookingTime;
+        if (typeof time === 'string') time = parseInt(time.replace(/\D/g, ''), 10) || 0;
+        formData.append('cookingTime', time);
+        
+        let serv = recipe.servings;
+        if (typeof serv === 'string') serv = parseInt(serv.replace(/\D/g, ''), 10) || 1;
+        formData.append('servings', serv);
+        
+        formData.append('ingredients', JSON.stringify(recipe.ingredients || []));
+        formData.append('instructions', JSON.stringify(recipe.instructions || []));
+        
+        if (selectedImage) {
+            formData.append('image', selectedImage);
+        }
 
-        await API.post("/recipes", recipe);
+        await API.post('/recipes', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
 
         toast.success("Recipe created successfully!");
 
@@ -145,6 +169,11 @@ const fetchCategories = async () => {
                     handleCategorySelect={(catName) => {
                         setSelectedCategory(catName);
                         sendMessage(`I choose the category: ${catName}`);
+                    }}
+                    difficulties={difficulties}
+                    handleDifficultySelect={(diffName) => {
+                        setSelectedDifficulty(diffName);
+                        sendMessage(`I choose the difficulty: ${diffName}`);
                     }}
                 />
 

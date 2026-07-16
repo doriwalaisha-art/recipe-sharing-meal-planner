@@ -1,6 +1,6 @@
 import {Bot, User, UploadCloud} from "lucide-react";
 
-const ChatMessage = ({ message, categories, handleCreateRecipe, setSelectedImage, handleCategorySelect }) => {
+const ChatMessage = ({ message, categories, handleCreateRecipe, setSelectedImage, handleCategorySelect, difficulties, handleDifficultySelect }) => {
     const isAI = message.sender === "ai";
 
     return (
@@ -26,6 +26,20 @@ const ChatMessage = ({ message, categories, handleCreateRecipe, setSelectedImage
                                 className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:border-primary hover:text-primary shadow-sm transition"
                             >
                                 {c.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {isAI && message.action === 'ask_difficulty' && difficulties && (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {difficulties.map(d => (
+                            <button
+                                key={d._id}
+                                onClick={() => handleDifficultySelect(d.name)}
+                                className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-sm font-medium text-gray-700 hover:border-primary hover:text-primary shadow-sm transition"
+                            >
+                                {d.name}
                             </button>
                         ))}
                     </div>
