@@ -1,19 +1,22 @@
-import  { useState, useEffect, useRef } from "react";
-import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, RefreshCw, Upload } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, RefreshCw, Upload, Edit, Eye } from "lucide-react";
 import API from "../api/axios";
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 
 const STEPS = [
     { key: "title", question: "What is the name of the recipe you want to create?", placeholder: "e.g., Paneer Butter Masala", chips: ["Butter Chicken", "Masala Dosa", "Veg Biryani", "Pasta Carbonara"] },
+    { key: "descriptionChoice", question: "Would you like to write the description yourself or generate it using AI?", chips: ["Write Myself", "Generate with AI"] },
+    { key: "description", question: "Please enter the description of your recipe:", placeholder: "e.g., A rich and creamy classic North Indian dish..." },
     { key: "category", question: "Select the Category for your recipe:", chips: ['Breakfast','Brunch','Lunch','Snacks','Dinner','Dessert','Beverages','Salad','Soup','Vegetarian','Non-Vegetarian','Vegan','Healthy','High-Protein','Quick Meals','Jain'] },
-    { key: "description", question: "Describe your recipe briefly (or select 'Let AI Generate'):", placeholder: "e.g., A rich and creamy classic North Indian dish...", chips: ["Let AI Generate"] },
     { key: "cookingTime", question: "What is the estimated cooking time (in minutes)?", placeholder: "e.g., 30", chips: ["15", "30", "45", "60"] },
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
     { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
-    { key: "ingredients", question: "List your ingredients separated by commas (or select 'Let AI Generate'):", placeholder: "e.g., 200g paneer, 2 tomatoes, 1 tbsp butter, cream...", chips: ["Let AI Generate"] },
-    { key: "instructions", question: "Describe step-by-step instructions (or select 'Let AI Generate'):", placeholder: "e.g., 1. Fry paneer. 2. Make tomato gravy. 3. Mix and simmer...", chips: ["Let AI Generate"] },
-    { key: "image", question: "Please upload an image for your recipe:", chips: [] } // Step 9: Image upload
+    { key: "image", question: "Please upload an image for your recipe:", chips: [] },
+    { key: "ingredientsChoice", question: "Would you like to write ingredients yourself or generate with AI?", chips: ["Write Myself", "Generate with AI"] },
+    { key: "ingredients", question: "List your ingredients separated by commas:", placeholder: "e.g., 200g paneer, 2 tomatoes, 1 tbsp butter, cream..." },
+    { key: "instructionsChoice", question: "Would you like to write cooking instructions yourself or generate with AI?", chips: ["Write Myself", "Generate with AI"] },
+    { key: "instructions", question: "Describe step-by-step instructions:", placeholder: "e.g., 1. Fry paneer. 2. Make tomato gravy. 3. Mix and simmer..." }
 ];
 
 const LOADING_MESSAGES = [
@@ -26,6 +29,24 @@ const LOADING_MESSAGES = [
     "Almost Done..."
 ];
 
+const getStageNumber = (key) => {
+    switch (key) {
+        case "title": return 1;
+        case "descriptionChoice":
+        case "description": return 2;
+        case "category": return 3;
+        case "cookingTime": return 4;
+        case "servings": return 5;
+        case "difficulty": return 6;
+        case "image": return 7;
+        case "ingredientsChoice":
+        case "ingredients": return 8;
+        case "instructionsChoice":
+        case "instructions": return 9;
+        default: return 9;
+    }
+};
+
 const AIRecipeStudio = () => {
     const navigate = useNavigate();
     
@@ -35,6 +56,10 @@ const AIRecipeStudio = () => {
     });
     const [currentStepIndex, setCurrentStepIndex] = useState(() => {
         return parseInt(localStorage.getItem("ai_studio_step") || "0");
+    });
+    const [stepHistory, setStepHistory] = useState(() => {
+        const saved = localStorage.getItem("ai_studio_step_history");
+        return saved ? JSON.parse(saved) : [0];
     });
     const [recipeDraft, setRecipeDraft] = useState(() => {
         const saved = localStorage.getItem("ai_studio_draft");
@@ -62,15 +87,24 @@ const AIRecipeStudio = () => {
     const [isCreatingRecipe, setIsCreatingRecipe] = useState(false);
     const [successCreated, setSuccessCreated] = useState(false);
 
-    // Edit prompt state
-    const [editPrompt, setEditPrompt] = useState("");
+    // Inline Editing Preview State
+    const [isEditingPreview, setIsEditingPreview] = useState(false);
+    const [editedTitle, setEditedTitle] = useState("");
+    const [editedDescription, setEditedDescription] = useState("");
+    const [editedCookingTime, setEditedCookingTime] = useState("");
+    const [editedServings, setEditedServings] = useState("");
+    const [editedDifficulty, setEditedDifficulty] = useState("");
+    const [editedIngredients, setEditedIngredients] = useState("");
+    const [editedInstructions, setEditedInstructions] = useState("");
 
     const chatEndRef = useRef(null);
+    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
 
     // Persist State to LocalStorage
     useEffect(() => {
         localStorage.setItem("ai_studio_started", started);
         localStorage.setItem("ai_studio_step", currentStepIndex);
+        localStorage.setItem("ai_studio_step_history", JSON.stringify(stepHistory));
         localStorage.setItem("ai_studio_draft", JSON.stringify(recipeDraft));
         localStorage.setItem("ai_studio_messages", JSON.stringify(messages));
         if (generatedRecipe) {
@@ -78,7 +112,7 @@ const AIRecipeStudio = () => {
         } else {
             localStorage.removeItem("ai_studio_recipe");
         }
-    }, [started, currentStepIndex, recipeDraft, messages, generatedRecipe]);
+    }, [started, currentStepIndex, stepHistory, recipeDraft, messages, generatedRecipe]);
 
     // Auto Scroll Chat
     useEffect(() => {
@@ -96,8 +130,6 @@ const AIRecipeStudio = () => {
         return () => clearInterval(interval);
     }, [isTyping, currentStepIndex]);
 
-    const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
-
     const handleStart = () => {
         setStarted(true);
     };
@@ -113,15 +145,39 @@ const AIRecipeStudio = () => {
         setInputText("");
 
         const nextDraft = { ...recipeDraft, [currentStep.key]: text };
+        
+        let nextStepIndex = currentStepIndex + 1;
+        
+        // Handle conditional path choices and skipping
+        if (currentStep.key === "descriptionChoice") {
+            if (text === "Generate with AI") {
+                nextDraft.description = "__AUTO__";
+                nextStepIndex = STEPS.findIndex(s => s.key === "category");
+            }
+        } else if (currentStep.key === "ingredientsChoice") {
+            if (text === "Generate with AI") {
+                nextDraft.ingredients = "__AUTO__";
+                nextStepIndex = STEPS.findIndex(s => s.key === "instructionsChoice");
+            }
+        } else if (currentStep.key === "instructionsChoice") {
+            if (text === "Generate with AI") {
+                nextDraft.instructions = "__AUTO__";
+                nextStepIndex = STEPS.length; // Complete
+            }
+        }
+
         setRecipeDraft(nextDraft);
 
-        if (currentStepIndex < STEPS.length - 1) {
-            const nextStepIndex = currentStepIndex + 1;
+        if (nextStepIndex < STEPS.length) {
             setCurrentStepIndex(nextStepIndex);
+            setStepHistory((prev) => [...prev, nextStepIndex]);
             setMessages((prev) => [
                 ...prev,
                 { sender: "ai", text: STEPS[nextStepIndex].question }
             ]);
+        } else {
+            setCurrentStepIndex(STEPS.length);
+            triggerGeneration(nextDraft);
         }
     };
 
@@ -134,17 +190,48 @@ const AIRecipeStudio = () => {
         const updatedMessages = [...messages, { sender: "user", text: `📸 Uploaded image: ${file.name}` }];
         setMessages(updatedMessages);
 
-        // Move to generation stage
+        // Proceed directly to Step 8 (ingredientsChoice)
         const nextStepIndex = currentStepIndex + 1;
         setCurrentStepIndex(nextStepIndex);
-        triggerGeneration(recipeDraft);
+        setStepHistory((prev) => [...prev, nextStepIndex]);
+        setMessages((prev) => [
+            ...prev,
+            { sender: "ai", text: STEPS[nextStepIndex].question }
+        ]);
     };
 
     const triggerGeneration = async (draft) => {
+        // If user manually entered everything, skip Gemini
+        if (
+            draft.description !== "__AUTO__" &&
+            draft.ingredients !== "__AUTO__" &&
+            draft.instructions !== "__AUTO__"
+        ) {
+            const parsedIng = draft.ingredients.split(",").map(i => i.trim()).filter(Boolean);
+            const parsedInst = draft.instructions.split(/\r?\n/).map(i => i.trim()).filter(Boolean);
+            const mockRecipe = {
+                title: draft.title,
+                description: draft.description,
+                cookingTime: parseInt(draft.cookingTime) || 30,
+                servings: parseInt(draft.servings) || 2,
+                difficulty: draft.difficulty || "Medium",
+                ingredients: parsedIng,
+                instructions: parsedInst,
+                tips: ["Enjoy your homemade recipe!"],
+                nutrition: { protein: "—", carbs: "—", fat: "—", fiber: "—" },
+                tags: [draft.category, draft.difficulty]
+            };
+            setGeneratedRecipe(mockRecipe);
+            setMessages((prev) => [
+                ...prev,
+                { sender: "ai", text: "✨ Recipe prepared manually! Review your details in the preview panel below." }
+            ]);
+            return;
+        }
+
         setIsTyping(true);
         try {
-            const response = await API.post("/ai/chat", {
-                action: "generate",
+            const response = await API.post("/ai/generate-recipe", {
                 recipeDraft: draft
             });
             if (response.data?.success && response.data?.recipe) {
@@ -160,15 +247,25 @@ const AIRecipeStudio = () => {
             console.error(error);
             const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to generate recipe.";
             toast.error(`Generation Error: ${errMsg}`);
-            setCurrentStepIndex(STEPS.length - 2); // Go back to instructions step to allow retry
+            // Go back to the last question index to allow retry
+            if (stepHistory.length > 0) {
+                setCurrentStepIndex(stepHistory[stepHistory.length - 1]);
+            } else {
+                setCurrentStepIndex(STEPS.length - 1);
+            }
         } finally {
             setIsTyping(false);
         }
     };
 
     const handleUndo = () => {
-        if (currentStepIndex === 0) return;
-        const targetStepIndex = currentStepIndex - 1;
+        if (stepHistory.length <= 1) return;
+        
+        const newHistory = [...stepHistory];
+        newHistory.pop();
+        const targetStepIndex = newHistory[newHistory.length - 1];
+        
+        setStepHistory(newHistory);
         setCurrentStepIndex(targetStepIndex);
         
         const newMessages = [...messages];
@@ -181,7 +278,8 @@ const AIRecipeStudio = () => {
             ...newMessages,
             { sender: "ai", text: STEPS[targetStepIndex].question }
         ]);
-        if (targetStepIndex === STEPS.length - 1) {
+
+        if (targetStepIndex < STEPS.findIndex(s => s.key === "image")) {
             setSelectedImage(null);
         }
     };
@@ -190,11 +288,13 @@ const AIRecipeStudio = () => {
         if (window.confirm("Are you sure you want to reset the conversation and start over?")) {
             localStorage.removeItem("ai_studio_started");
             localStorage.removeItem("ai_studio_step");
+            localStorage.removeItem("ai_studio_step_history");
             localStorage.removeItem("ai_studio_draft");
             localStorage.removeItem("ai_studio_messages");
             localStorage.removeItem("ai_studio_recipe");
             setStarted(false);
             setCurrentStepIndex(0);
+            setStepHistory([0]);
             setRecipeDraft({
                 title: "", category: "", description: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
             });
@@ -204,89 +304,39 @@ const AIRecipeStudio = () => {
             ]);
             setGeneratedRecipe(null);
             setSuccessCreated(false);
+            setIsEditingPreview(false);
         }
     };
 
-    // Conversational edits
-    const handleConversationalEdit = async () => {
-        if (!editPrompt.trim()) return;
-        setIsTyping(true);
-        const userPrompt = editPrompt;
-        setEditPrompt("");
-        
-        setMessages((prev) => [...prev, { sender: "user", text: userPrompt }]);
-
-        try {
-            const response = await API.post("/ai/chat", {
-                action: "edit",
-                currentRecipe: generatedRecipe,
-                instruction: userPrompt
-            });
-            if (response.data?.success && response.data?.recipe) {
-                setGeneratedRecipe(response.data.recipe);
-                setMessages((prev) => [
-                    ...prev,
-                    { sender: "ai", text: `I have updated the recipe based on: "${userPrompt}"` }
-                ]);
-            }
-        } catch (error) {
-            console.error(error);
-            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to edit recipe.";
-            toast.error(`Edit Error: ${errMsg}`);
-        } finally {
-            setIsTyping(false);
-        }
+    // Toggle Preview Edit Mode
+    const handleStartEdit = () => {
+        setEditedTitle(generatedRecipe.title);
+        setEditedDescription(generatedRecipe.description || "");
+        setEditedCookingTime(generatedRecipe.cookingTime);
+        setEditedServings(generatedRecipe.servings);
+        setEditedDifficulty(generatedRecipe.difficulty);
+        setEditedIngredients(generatedRecipe.ingredients ? generatedRecipe.ingredients.join(", ") : "");
+        setEditedInstructions(generatedRecipe.instructions ? generatedRecipe.instructions.join("\n") : "");
+        setIsEditingPreview(true);
     };
 
-    const handleVariation = async (style) => {
-        setIsTyping(true);
-        try {
-            const response = await API.post("/ai/chat", {
-                action: "variation",
-                currentRecipe: generatedRecipe,
-                variation: style
-            });
-            if (response.data?.success && response.data?.recipe) {
-                setGeneratedRecipe(response.data.recipe);
-                setMessages((prev) => [
-                    ...prev,
-                    { sender: "ai", text: `Here is the ${style} variation of your recipe!` }
-                ]);
-            }
-        } catch (error) {
-            console.error(error);
-            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to apply variation.";
-            toast.error(`Variation Error: ${errMsg}`);
-        } finally {
-            setIsTyping(false);
-        }
+    const handleSaveChanges = () => {
+        const updated = {
+            ...generatedRecipe,
+            title: editedTitle,
+            description: editedDescription,
+            cookingTime: parseInt(editedCookingTime) || 30,
+            servings: parseInt(editedServings) || 2,
+            difficulty: editedDifficulty,
+            ingredients: editedIngredients.split(",").map(i => i.trim()).filter(Boolean),
+            instructions: editedInstructions.split(/\r?\n/).map(i => i.trim()).filter(Boolean)
+        };
+        setGeneratedRecipe(updated);
+        setIsEditingPreview(false);
+        toast.success("Recipe changes saved locally!");
     };
 
-    const handleRegenerateField = async (field) => {
-        setIsTyping(true);
-        try {
-            const response = await API.post("/ai/chat", {
-                action: "regenerate_field",
-                currentRecipe: generatedRecipe,
-                fieldToRegenerate: field
-            });
-            if (response.data?.success && response.data?.recipe) {
-                setGeneratedRecipe(response.data.recipe);
-                setMessages((prev) => [
-                    ...prev,
-                    { sender: "ai", text: `Regenerated ${field} successfully!` }
-                ]);
-            }
-        } catch (error) {
-            console.error(error);
-            const errMsg = error.response?.data?.error || error.response?.data?.message || error.message || "Failed to regenerate.";
-            toast.error(`Regenerate Error: ${errMsg}`);
-        } finally {
-            setIsTyping(false);
-        }
-    };
-
-    // Save recipe to DB using FormData
+    // Save recipe to DB using existing POST /recipes endpoint
     const handleSaveRecipe = async () => {
         if (isCreatingRecipe) return;
         setIsCreatingRecipe(true);
@@ -321,14 +371,14 @@ const AIRecipeStudio = () => {
                 setSuccessCreated(true);
                 toast.success("Recipe Saved Successfully! 🎉");
                 
-                // Clear local storage
+                // Clear state
                 localStorage.removeItem("ai_studio_started");
                 localStorage.removeItem("ai_studio_step");
+                localStorage.removeItem("ai_studio_step_history");
                 localStorage.removeItem("ai_studio_draft");
                 localStorage.removeItem("ai_studio_messages");
                 localStorage.removeItem("ai_studio_recipe");
 
-                // Auto redirect to Home Page to show the new recipe
                 setTimeout(() => {
                     navigate("/");
                 }, 1500);
@@ -342,6 +392,7 @@ const AIRecipeStudio = () => {
     };
 
     const imagePreviewUrl = selectedImage ? URL.createObjectURL(selectedImage) : null;
+    const currentStage = getStageNumber(STEPS[currentStepIndex]?.key || "instructions");
 
     // Welcome Screen
     if (!started) {
@@ -399,12 +450,12 @@ const AIRecipeStudio = () => {
                         {/* Progress Bar */}
                         <div className="bg-orange-50/30 px-6 py-3 border-b border-orange-100/50 flex justify-between items-center">
                             <span className="text-xs font-semibold text-primary">
-                                Progress: Step {Math.min(currentStepIndex + 1, STEPS.length)} of {STEPS.length}
+                                Progress: Step {currentStage} of 9
                             </span>
                             <div className="w-1/2 bg-gray-100 h-1.5 rounded-full overflow-hidden">
                                 <div
                                     className="bg-primary h-full transition-all duration-300"
-                                    style={{ width: `${(Math.min(currentStepIndex + 1, STEPS.length) / STEPS.length) * 100}%` }}
+                                    style={{ width: `${(currentStage / 9) * 100}%` }}
                                 />
                             </div>
                         </div>
@@ -500,7 +551,7 @@ const AIRecipeStudio = () => {
                                     {!isTyping && currentStepIndex < STEPS.length && (
                                         <div className="flex gap-2">
                                             <input
-                                                type="text"
+                                                type={STEPS[currentStepIndex].key === "cookingTime" || STEPS[currentStepIndex].key === "servings" ? "number" : "text"}
                                                 value={inputText}
                                                 onChange={(e) => setInputText(e.target.value)}
                                                 placeholder={STEPS[currentStepIndex].placeholder || "Type your answer..."}
@@ -527,163 +578,244 @@ const AIRecipeStudio = () => {
                         <div className="lg:col-span-8 space-y-6">
                             {!successCreated ? (
                                 <div className="bg-white rounded-3xl p-6 shadow-xl border border-orange-100 space-y-6">
-                                    <div className="flex justify-between items-start border-b pb-4">
-                                        <div>
-                                            <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wider">
-                                                {generatedRecipe.difficulty} • {recipeDraft.category || "Dinner"}
-                                            </span>
-                                            <h2 className="text-3xl font-extrabold text-textDark mt-2">
-                                                {generatedRecipe.title}
-                                            </h2>
-                                            <p className="text-gray-500 text-sm mt-1 leading-relaxed">
-                                                {generatedRecipe.description}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Stats Grid */}
-                                    <div className="grid grid-cols-4 gap-3 text-center">
-                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
-                                            <p className="text-[10px] uppercase font-bold text-gray-400">Cook Time</p>
-                                            <p className="font-extrabold text-sm text-textDark">{generatedRecipe.cookingTime} Min</p>
-                                        </div>
-                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
-                                            <p className="text-[10px] uppercase font-bold text-gray-400">Servings</p>
-                                            <p className="font-extrabold text-sm text-textDark">{generatedRecipe.servings}</p>
-                                        </div>
-                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
-                                            <p className="text-[10px] uppercase font-bold text-gray-400">Calories</p>
-                                            <p className="font-extrabold text-sm text-textDark">{generatedRecipe.estimatedCalories || "—"}</p>
-                                        </div>
-                                        <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
-                                            <p className="text-[10px] uppercase font-bold text-gray-400">Category</p>
-                                            <p className="font-extrabold text-sm text-textDark capitalize">{recipeDraft.category || "Dinner"}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Recipe Image Preview */}
-                                    {imagePreviewUrl && (
-                                        <div>
-                                            <h4 className="font-bold text-lg text-textDark mb-2">📸 Selected Recipe Image</h4>
-                                            <img
-                                                src={imagePreviewUrl}
-                                                alt="Uploaded preview"
-                                                className="w-full h-64 object-cover rounded-2xl border border-orange-100"
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Ingredients */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="font-bold text-lg text-textDark flex items-center gap-2">
-                                                🥕 Ingredients
-                                            </h4>
-                                            <button
-                                                onClick={() => handleRegenerateField("ingredients")}
-                                                className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
-                                            >
-                                                <RefreshCw size={10} /> Regenerate
-                                            </button>
-                                        </div>
-                                        <ul className="grid md:grid-cols-2 gap-2">
-                                            {generatedRecipe.ingredients?.map((ing, i) => (
-                                                <li key={i} className="bg-bgLight px-4 py-2.5 rounded-xl border border-orange-100/30 text-sm text-gray-700">
-                                                    • {ing}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-
-                                    {/* Instructions */}
-                                    <div>
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="font-bold text-lg text-textDark flex items-center gap-2">
-                                                👨‍🍳 Step-by-Step Instructions
-                                            </h4>
-                                            <button
-                                                onClick={() => handleRegenerateField("instructions")}
-                                                className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"
-                                            >
-                                                <RefreshCw size={10} /> Regenerate
-                                            </button>
-                                        </div>
-                                        <ol className="space-y-3">
-                                            {generatedRecipe.instructions?.map((inst, i) => (
-                                                <li key={i} className="flex gap-3 items-start">
-                                                    <span className="w-6 h-6 bg-primary/10 text-primary font-extrabold rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
-                                                        {i + 1}
-                                                    </span>
-                                                    <p className="text-sm text-gray-600 leading-relaxed">
-                                                        {inst}
-                                                    </p>
-                                                </li>
-                                            ))}
-                                        </ol>
-                                    </div>
-
-                                    {/* Chef Tips */}
-                                    {generatedRecipe.tips?.length > 0 && (
-                                        <div>
-                                            <h4 className="font-bold text-lg text-textDark mb-2 flex items-center gap-2">
-                                                💡 Chef Tips & Suggestions
-                                            </h4>
-                                            <ul className="space-y-1.5 list-disc pl-5 text-sm text-gray-600">
-                                                {generatedRecipe.tips.map((t, idx) => (
-                                                    <li key={idx}>{t}</li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-
-                                    {/* Nutrition Summary */}
-                                    {generatedRecipe.nutrition && (
-                                        <div>
-                                            <h4 className="font-bold text-lg text-textDark mb-3">
-                                                📊 Nutrition Facts
-                                            </h4>
-                                            <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
-                                                    <p className="text-gray-400">Protein</p>
-                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.protein || "—"}</p>
+                                    {isEditingPreview ? (
+                                        /* INLINE EDIT MODE FORM */
+                                        <div className="space-y-4">
+                                            <h3 className="text-xl font-bold text-textDark flex items-center gap-2 border-b pb-2">
+                                                <Edit size={20} className="text-primary" /> Edit Recipe Details
+                                            </h3>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Recipe Title</label>
+                                                <input
+                                                    type="text"
+                                                    value={editedTitle}
+                                                    onChange={(e) => setEditedTitle(e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+                                                <textarea
+                                                    rows="3"
+                                                    value={editedDescription}
+                                                    onChange={(e) => setEditedDescription(e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Cook Time (Min)</label>
+                                                    <input
+                                                        type="number"
+                                                        value={editedCookingTime}
+                                                        onChange={(e) => setEditedCookingTime(e.target.value)}
+                                                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark"
+                                                    />
                                                 </div>
-                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
-                                                    <p className="text-gray-400">Carbs</p>
-                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.carbs || "—"}</p>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Servings</label>
+                                                    <input
+                                                        type="number"
+                                                        value={editedServings}
+                                                        onChange={(e) => setEditedServings(e.target.value)}
+                                                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark"
+                                                    />
                                                 </div>
-                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
-                                                    <p className="text-gray-400">Fat</p>
-                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.fat || "—"}</p>
-                                                </div>
-                                                <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
-                                                    <p className="text-gray-400">Fiber</p>
-                                                    <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.fiber || "—"}</p>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-gray-500 mb-1">Difficulty</label>
+                                                    <select
+                                                        value={editedDifficulty}
+                                                        onChange={(e) => setEditedDifficulty(e.target.value)}
+                                                        className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark bg-white"
+                                                    >
+                                                        <option value="Easy">Easy</option>
+                                                        <option value="Medium">Medium</option>
+                                                        <option value="Hard">Hard</option>
+                                                    </select>
                                                 </div>
                                             </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Ingredients (comma-separated)</label>
+                                                <textarea
+                                                    rows="4"
+                                                    value={editedIngredients}
+                                                    onChange={(e) => setEditedIngredients(e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark"
+                                                    placeholder="e.g., 200g Paneer, 1 cup Cream, 1 tbsp Butter"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-gray-500 mb-1">Instructions (one per line)</label>
+                                                <textarea
+                                                    rows="5"
+                                                    value={editedInstructions}
+                                                    onChange={(e) => setEditedInstructions(e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-primary transition text-textDark"
+                                                    placeholder="e.g., 1. Fry paneer until golden.&#10;2. Mix spices in cream."
+                                                />
+                                            </div>
+                                            <div className="flex gap-3 pt-2">
+                                                <button
+                                                    onClick={handleSaveChanges}
+                                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition shadow-md flex items-center justify-center gap-2"
+                                                >
+                                                    <Check size={18} /> Save Changes
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsEditingPreview(false)}
+                                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-6 py-3 rounded-xl transition"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
                                         </div>
-                                    )}
+                                    ) : (
+                                        /* STATIC PREVIEW MODE */
+                                        <>
+                                            <div className="flex justify-between items-start border-b pb-4">
+                                                <div>
+                                                    <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wider">
+                                                        {generatedRecipe.difficulty} • {recipeDraft.category || "Dinner"}
+                                                    </span>
+                                                    <h2 className="text-3xl font-extrabold text-textDark mt-2">
+                                                        {generatedRecipe.title}
+                                                    </h2>
+                                                    <p className="text-gray-500 text-sm mt-1 leading-relaxed">
+                                                        {generatedRecipe.description}
+                                                    </p>
+                                                </div>
+                                            </div>
 
-                                    {/* Recipe Tags */}
-                                    {generatedRecipe.tags?.length > 0 && (
-                                        <div className="flex flex-wrap gap-2 pt-2 border-t border-orange-50">
-                                            {generatedRecipe.tags.map((t) => (
-                                                <span key={t} className="text-xs bg-gray-100 px-2.5 py-1 rounded-full text-gray-500">
-                                                    #{t}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
+                                            {/* Stats Grid */}
+                                            <div className="grid grid-cols-4 gap-3 text-center">
+                                                <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
+                                                    <p className="text-[10px] uppercase font-bold text-gray-400">Cook Time</p>
+                                                    <p className="font-extrabold text-sm text-textDark">{generatedRecipe.cookingTime} Min</p>
+                                                </div>
+                                                <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
+                                                    <p className="text-[10px] uppercase font-bold text-gray-400">Servings</p>
+                                                    <p className="font-extrabold text-sm text-textDark">{generatedRecipe.servings}</p>
+                                                </div>
+                                                <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
+                                                    <p className="text-[10px] uppercase font-bold text-gray-400">Calories</p>
+                                                    <p className="font-extrabold text-sm text-textDark">{generatedRecipe.estimatedCalories || "—"}</p>
+                                                </div>
+                                                <div className="bg-bgLight p-3 rounded-2xl border border-orange-100/50">
+                                                    <p className="text-[10px] uppercase font-bold text-gray-400">Category</p>
+                                                    <p className="font-extrabold text-sm text-textDark capitalize">{recipeDraft.category || "Dinner"}</p>
+                                                </div>
+                                            </div>
 
-                                    {/* Save Recipe Button */}
-                                    <div className="pt-4 border-t border-orange-50">
-                                        <button
-                                            onClick={handleSaveRecipe}
-                                            disabled={isCreatingRecipe}
-                                            className="w-full bg-primary hover:bg-secondary disabled:bg-gray-300 text-white py-3.5 rounded-2xl font-bold transition flex items-center justify-center gap-2 shadow-md"
-                                        >
-                                            <Save size={18} /> {isCreatingRecipe ? "Saving Recipe..." : "Save Recipe to My Account"}
-                                        </button>
-                                    </div>
+                                            {/* Recipe Image Preview */}
+                                            {imagePreviewUrl && (
+                                                <div>
+                                                    <h4 className="font-bold text-lg text-textDark mb-2">📸 Selected Recipe Image</h4>
+                                                    <img
+                                                        src={imagePreviewUrl}
+                                                        alt="Uploaded preview"
+                                                        className="w-full h-64 object-cover rounded-2xl border border-orange-100"
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Ingredients */}
+                                            <div>
+                                                <h4 className="font-bold text-lg text-textDark mb-3 flex items-center gap-2">
+                                                    🥕 Ingredients
+                                                </h4>
+                                                <ul className="grid md:grid-cols-2 gap-2">
+                                                    {generatedRecipe.ingredients?.map((ing, i) => (
+                                                        <li key={i} className="bg-bgLight px-4 py-2.5 rounded-xl border border-orange-100/30 text-sm text-gray-700">
+                                                            • {ing}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+
+                                            {/* Instructions */}
+                                            <div>
+                                                <h4 className="font-bold text-lg text-textDark mb-3 flex items-center gap-2">
+                                                    👨‍🍳 Step-by-Step Instructions
+                                                </h4>
+                                                <ol className="space-y-3">
+                                                    {generatedRecipe.instructions?.map((inst, i) => (
+                                                        <li key={i} className="flex gap-3 items-start">
+                                                            <span className="w-6 h-6 bg-primary/10 text-primary font-extrabold rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                                                                {i + 1}
+                                                            </span>
+                                                            <p className="text-sm text-gray-600 leading-relaxed">
+                                                                {inst}
+                                                            </p>
+                                                        </li>
+                                                    ))}
+                                                </ol>
+                                            </div>
+
+                                            {/* Chef Tips */}
+                                            {generatedRecipe.tips?.length > 0 && (
+                                                <div>
+                                                    <h4 className="font-bold text-lg text-textDark mb-2 flex items-center gap-2">
+                                                        💡 Chef Tips & Suggestions
+                                                    </h4>
+                                                    <ul className="space-y-1.5 list-disc pl-5 text-sm text-gray-600">
+                                                        {generatedRecipe.tips.map((t, idx) => (
+                                                            <li key={idx}>{t}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+
+                                            {/* Nutrition Summary */}
+                                            {generatedRecipe.nutrition && (
+                                                <div>
+                                                    <h4 className="font-bold text-lg text-textDark mb-3">
+                                                        📊 Nutrition Facts
+                                                    </h4>
+                                                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                                                        <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
+                                                            <p className="text-gray-400">Protein</p>
+                                                            <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.protein || "—"}</p>
+                                                        </div>
+                                                        <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
+                                                            <p className="text-gray-400">Carbs</p>
+                                                            <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.carbs || "—"}</p>
+                                                        </div>
+                                                        <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
+                                                            <p className="text-gray-400">Fat</p>
+                                                            <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.fat || "—"}</p>
+                                                        </div>
+                                                        <div className="border border-orange-100 p-2.5 rounded-xl bg-bgLight">
+                                                            <p className="text-gray-400">Fiber</p>
+                                                            <p className="font-bold text-textDark mt-0.5">{generatedRecipe.nutrition.fiber || "—"}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Action Buttons: Edit, Regenerate, Save */}
+                                            <div className="pt-6 border-t border-orange-50 flex flex-col md:flex-row gap-3">
+                                                <button
+                                                    onClick={handleStartEdit}
+                                                    className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition flex items-center justify-center gap-2 border border-gray-200"
+                                                >
+                                                    <Edit size={16} /> Edit Recipe
+                                                </button>
+                                                <button
+                                                    onClick={() => triggerGeneration(recipeDraft)}
+                                                    className="flex-1 py-3 px-4 bg-orange-100 hover:bg-orange-200 text-primary font-bold rounded-xl transition flex items-center justify-center gap-2"
+                                                >
+                                                    <RefreshCw size={16} /> Regenerate AI Fields
+                                                </button>
+                                                <button
+                                                    onClick={handleSaveRecipe}
+                                                    disabled={isCreatingRecipe}
+                                                    className="flex-1 py-3 px-4 bg-primary hover:bg-secondary disabled:bg-gray-300 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md"
+                                                >
+                                                    <Save size={16} /> {isCreatingRecipe ? "Saving..." : "Save Recipe"}
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             ) : (
                                 // Creation Success Panel
@@ -703,73 +835,15 @@ const AIRecipeStudio = () => {
 
                         {/* Interactive Editor panel (Right) */}
                         <div className="lg:col-span-4 space-y-6">
-                            {/* Variations Panel */}
-                            {!successCreated && (
-                                <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 space-y-4">
-                                    <h4 className="font-extrabold text-sm text-textDark uppercase tracking-wider flex items-center gap-1.5">
-                                        🎨 Instant Variations
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-2 text-xs">
-                                        {["Restaurant Style", "Dhaba Style", "Healthy", "Low Oil", "High Protein", "Jain Version"].map((v) => (
-                                            <button
-                                                key={v}
-                                                onClick={() => handleVariation(v)}
-                                                disabled={isTyping}
-                                                className="py-2.5 border border-gray-200 hover:border-primary text-gray-700 rounded-xl transition duration-300 font-semibold hover:bg-orange-50/30"
-                                            >
-                                                {v}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Chat Refiner / Editor */}
-                            {!successCreated && (
-                                <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 space-y-4">
-                                    <h4 className="font-extrabold text-sm text-textDark uppercase tracking-wider flex items-center gap-1.5">
-                                        💬 Conversational Editor
-                                    </h4>
-                                    <p className="text-xs text-gray-400">
-                                        Type instructions like "Make it spicy", "Substitute cream with milk", or "Reduce sugar".
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={editPrompt}
-                                            onChange={(e) => setEditPrompt(e.target.value)}
-                                            placeholder="Ask to adjust anything..."
-                                            disabled={isTyping}
-                                            onKeyDown={(e) => e.key === "Enter" && handleConversationalEdit()}
-                                            className="flex-1 border border-orange-200 rounded-xl px-3.5 py-2.5 text-xs outline-none focus:ring-2 focus:ring-primary transition bg-orange-50/10 text-textDark"
-                                        />
-                                        <button
-                                            onClick={handleConversationalEdit}
-                                            disabled={isTyping || !editPrompt.trim()}
-                                            className="bg-primary hover:bg-secondary text-white px-3.5 rounded-xl transition shadow-sm flex items-center justify-center disabled:bg-gray-300"
-                                        >
-                                            <CornerDownLeft size={14} />
-                                        </button>
-                                    </div>
-                                    
-                                    {/* Mini status indicator */}
-                                    {isTyping && (
-                                        <div className="flex items-center gap-2 text-xs text-primary font-bold animate-pulse justify-center">
-                                            <RefreshCw size={12} className="animate-spin" /> Adjusting recipe...
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
                             {/* Chat history logs */}
-                            <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 max-h-[30vh] overflow-y-auto space-y-2">
-                                <h4 className="font-extrabold text-xs text-gray-400 uppercase tracking-wider">
-                                    📜 Chat Log
+                            <div className="bg-white rounded-3xl p-5 shadow-xl border border-orange-100 max-h-[70vh] overflow-y-auto space-y-3 flex flex-col h-full">
+                                <h4 className="font-extrabold text-sm text-gray-400 uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+                                    <Eye size={16} className="text-primary" /> Chat History Log
                                 </h4>
-                                <div className="space-y-2">
+                                <div className="space-y-3 overflow-y-auto flex-1 pr-1">
                                     {messages.map((m, idx) => (
                                         <div key={idx} className="text-xs leading-relaxed text-gray-500 border-b border-orange-50/30 pb-2 last:border-b-0">
-                                            <strong className="capitalize">{m.sender}: </strong> {m.text}
+                                            <strong className="capitalize text-textDark">{m.sender}: </strong> {m.text}
                                         </div>
                                     ))}
                                 </div>

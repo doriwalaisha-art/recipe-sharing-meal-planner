@@ -244,4 +244,124 @@ Strictly return ONLY a valid JSON object matching the recipe schema.
     }
 };
 
-module.exports = { chatWithAI };
+const generateRecipeFromStudio = async (req, res) => {
+    try {
+        const { recipeDraft } = req.body;
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (!apiKey) {
+            return res.status(500).json({
+                success: false,
+                error: "GEMINI_API_KEY is not configured on the server."
+            });
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
+
+        const generateDescription = recipeDraft.description === "__AUTO__";
+        const generateIngredients = recipeDraft.ingredients === "__AUTO__";
+        const generateInstructions = recipeDraft.instructions === "__AUTO__";
+
+        let instructionsList = [];
+        if (!generateInstructions) {
+            instructionsList = recipeDraft.instructions.split(/\r?\n/).map(i => i.trim()).filter(Boolean);
+        }
+
+        let ingredientsList = [];
+        if (!generateIngredients) {
+            ingredientsList = recipeDraft.ingredients.split(/,/).map(i => i.trim()).filter(Boolean);
+        }
+
+        const prompt = `
+You are a Professional Chef and AI Recipe Generator.
+Generate or complete a high-quality recipe matching the details below.
+
+Recipe Details:
+- Title: ${recipeDraft.title}
+- Category: ${recipeDraft.category}
+- Cooking Time: ${recipeDraft.cookingTime} minutes
+- Servings: ${recipeDraft.servings}
+- Difficulty: ${recipeDraft.difficulty}
+
+Your generation instructions:
+1. Description: ${generateDescription ? "Generate an appetizing description." : `MUST USE this exact description: "${recipeDraft.description}"`}
+2. Ingredients: ${generateIngredients ? "Generate a realistic list of ingredients with exact quantities." : `MUST USE these exact ingredients: ${JSON.stringify(ingredientsList)}`}
+3. Instructions: ${generateInstructions ? "Generate clear step-by-step instructions." : `MUST USE these exact instructions: ${JSON.stringify(instructionsList)}`}
+
+Strictly return ONLY a valid JSON object matching this schema. No markdown formatting. No conversational text.
+JSON Schema:
+{
+  "title": "${recipeDraft.title}",
+  "description": "Appetizing description.",
+  "cookingTime": ${parseInt(recipeDraft.cookingTime) || 30},
+  "servings": ${parseInt(recipeDraft.servings) || 2},
+  "difficulty": "${recipeDraft.difficulty}",
+  "estimatedCalories": "350 kcal",
+  "ingredients": [
+    "exact quantity and ingredient (e.g. 2 cups Basmati Rice)"
+  ],
+  "instructions": [
+    "Step-by-step instruction 1",
+    "Step-by-step instruction 2"
+  ],
+  "tips": [
+    "Chef tip 1"
+  ],
+  "nutrition": {
+    "protein": "15g",
+    "carbs": "45g",
+    "fat": "10g",
+    "fiber": "4g"
+  },
+  "tags": ["${recipeDraft.category}", "${recipeDraft.difficulty}"]
+}
+`;
+
+        console.log(`[AI Studio] Generating recipe from studio using model: ${CURRENT_MODEL}`);
+        let response = await attemptGenerateWithRetry(ai, prompt);
+        
+        let result;
+        try {
+            result = parseJSONResponse(response.text);
+        } catch (parseErr) {
+            console.warn("[AI Studio] Failed to parse JSON response. Attempting one automatic regeneration...");
+            response = await attemptGenerateWithRetry(ai, prompt + "\nStrictly output valid JSON. Fix any JSON formatting errors.");
+            result = parseJSONResponse(response.text);
+        }
+
+        // Force manual input preservation
+        if (!generateDescription) {
+            result.description = recipeDraft.description;
+        }
+        if (!generateIngredients) {
+            result.ingredients = ingredientsList;
+        }
+        if (!generateInstructions) {
+            result.instructions = instructionsList;
+        }
+
+        return res.status(200).json({ success: true, recipe: result });
+
+    } catch (error) {
+        console.error("[AI Studio Error]", error);
+
+        const isRateLimit = error.status === 429 || 
+                            error.message?.toLowerCase().includes("quota") || 
+                            error.message?.toLowerCase().includes("limit") ||
+                            error.message?.toLowerCase().includes("exhausted");
+
+        if (isRateLimit) {
+            return res.status(429).json({
+                success: false,
+                error: "AI service is temporarily unavailable. Please try again later."
+            });
+        }
+
+        return res.status(500).json({
+            success: false,
+            error: "Failed to generate recipe. Please try again."
+        });
+    }
+};
+
+module.exports = { chatWithAI, generateRecipeFromStudio };
