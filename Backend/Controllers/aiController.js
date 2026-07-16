@@ -1,128 +1,118 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY
-});
+const MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
+
+const withTimeout = (promise, ms) =>
+    Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`AI request timed out after ${ms / 1000}s`)), ms)
+        ),
+    ]);
 
 const generateRecipe = async (req, res) => {
     try {
         const { title, description } = req.body;
 
-        if(!title || title.trim() === "" ) {
+        if (!title || title.trim() === "") {
+            return res.status(400).json({ message: "Title is required" });
+        }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({ message: "GEMINI_API_KEY is not configured." });
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
+
+        // --- Step 1: Validate it's a food recipe ---
+        const validationPrompt = `
+You are a food validation assistant.
+Determine whether the following title and description describe a real food recipe.
+
+Recipe Title: ${title}
+Recipe Description: ${description || "No description"}
+
+Reply with ONLY one word: YES or NO.
+YES → if the title and description are about a food recipe or dish.
+NO → if they are names of people, places, random words, meaningless text, numbers, greetings, objects, animals, movies, sports, or anything that is not a recipe.
+`;
+
+        let validationResponse = null;
+        for (const model of MODELS) {
+            try {
+                validationResponse = await withTimeout(
+                    ai.models.generateContent({ model, contents: validationPrompt }),
+                    15000
+                );
+                break;
+            } catch (err) {
+                console.warn(`[AI Generate] Validation model ${model} failed:`, err.message);
+            }
+        }
+
+        if (!validationResponse) {
+            return res.status(503).json({ message: "AI service unavailable. Please try again." });
+        }
+
+        const validation = validationResponse.text.trim().toUpperCase();
+        if (validation !== "YES") {
             return res.status(400).json({
-                message : "Title is required"
+                message: "Please enter a valid recipe title and description related to food.",
             });
         }
 
-        const validationPrompt = `
-            You are a food validation assistant.
-        
-            Determine whether the following title and description describe a real food recipe.
-        
-            Recipe Title: ${title}
-            Recipe Description: ${description || "No description"}
-        
-            Reply with ONLY one word.
-        
-            YES -> if the title and description are about a food recipe or dish.
-        
-            NO -> if they are names of people, places, random words, meaningless text, numbers, greetings, objects, animals, movies, sports, or anything that is not a recipe.
-        
-            Return only YES or NO.
-        `;
-
-        const validationResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: validationPrompt
-        });
-
-        const validation = validationResponse.text.trim().toUpperCase();
-
-        if (validation !== "YES") {
-            return res.status(400).json({
-                message: "Please enter a valid recipe title and description related to food."
-            });
-        }   
-               
+        // --- Step 2: Generate recipe ---
         const prompt = `
-            You are an expert chef and recipe validator.
-                
-            Your task is to first determine whether the given recipe title and description represent a real, meaningful food recipe.
-                
-            Recipe Title: ${title}
-            Recipe Description: ${description || "No description provided"}
-                
-            Rules:
-                
-            1. If the title or description is meaningless, placeholder text, random words, numbers, unrelated to food, or does not describe a recipe (examples: "demo", "test", "abc", "xyz", "123", "hello", "sample", "qwerty"), DO NOT generate ingredients or instructions.
-                
-            Instead, return ONLY this JSON:
-                
-            {
-              "success": false,
-              "message": "Please enter a valid recipe title and description related to food."
-            }
-                
-            2. If the title describes a real food item but the description is missing or short, intelligently generate suitable ingredients and cooking instructions based on the recipe title.
-                
-            3. If both the title and description describe a valid recipe, generate ingredients and cooking instructions that match the recipe accurately.
-                
-            4. Ingredients should contain only ingredient names with quantities.
-                
-            5. Instructions should be short, clear, and beginner-friendly.
-                
-            6. Each instruction must contain only one cooking action.
-                
-            7. Do not generate unnecessary stories, tips, notes, nutrition facts, or explanations.
-                
-            8. Return ONLY valid JSON.
-                
-            Output format for a valid recipe:
-                
-            {
-              "success": true,
-              "ingredients": [
-                "Ingredient 1",
-                "Ingredient 2"
-              ],
-              "instructions": [
-                "Step 1",
-                "Step 2"
-              ]
-            }
-                
-            Do NOT use markdown.
-                
-            Do NOT use \`\`\`json.
-                
-            Return ONLY JSON.
-            `;
-                
-        const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt
-        });
+You are an expert chef and recipe generator.
 
-        let text = response.text.trim();
+Recipe Title: ${title}
+Recipe Description: ${description || "No description provided"}
 
-        //remove markdown
-        text = text.replace(/```json/g, "");
-        text = text.replace(/```/g, "").trim();
-    
+Rules:
+1. Generate suitable ingredients and cooking instructions for this recipe.
+2. Ingredients must contain ingredient names with quantities.
+3. Instructions must be short, clear, and beginner-friendly.
+4. Each instruction contains only one cooking action.
+5. Do NOT generate stories, tips, notes, or nutrition facts.
+6. Return ONLY valid JSON. No markdown. No \`\`\`json.
+
+{
+  "success": true,
+  "ingredients": ["Ingredient 1", "Ingredient 2"],
+  "instructions": ["Step 1", "Step 2"]
+}
+`;
+
+        let recipeResponse = null;
+        for (const model of MODELS) {
+            try {
+                recipeResponse = await withTimeout(
+                    ai.models.generateContent({ model, contents: prompt }),
+                    25000
+                );
+                break;
+            } catch (err) {
+                console.warn(`[AI Generate] Recipe model ${model} failed:`, err.message);
+            }
+        }
+
+        if (!recipeResponse) {
+            return res.status(503).json({ message: "AI service unavailable. Please try again." });
+        }
+
+        let text = recipeResponse.text
+            .replace(/```json/gi, "")
+            .replace(/```/g, "")
+            .trim();
+
         const recipe = JSON.parse(text);
         res.status(200).json(recipe);
-    
-    }catch(error) {
-        console.log("Gemini Error:", error);
-
-        res.status(500).json({
-            message: "Failed to generate recipe."
-        });
-
+    } catch (error) {
+        console.error("[AI Generate Error]", error.message);
+        res.status(500).json({ message: "Failed to generate recipe. Please try again." });
     }
 };
 
-module.exports = {
-    generateRecipe
-};
+module.exports = { generateRecipe };

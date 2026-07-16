@@ -1,14 +1,65 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
+// Model priority list — primary first, fallback second
+const MODELS = ["gemini-2.0-flash", "gemini-2.0-flash-lite"];
+
+// Timeout wrapper: rejects after ms milliseconds
+const withTimeout = (promise, ms) =>
+    Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`AI request timed out after ${ms / 1000}s`)), ms)
+        ),
+    ]);
+
+// Attempt generateContent with a single model
+const attemptGenerate = async (ai, model, prompt) => {
+    const response = await ai.models.generateContent({
+        model,
+        contents: prompt,
+        config: { responseMimeType: "application/json" },
+    });
+    return response;
+};
+
+// Parse and validate AI response text
+const parseAIResponse = (text) => {
+    // Strip any accidental markdown fences
+    let clean = text
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+
+    let result;
+    try {
+        result = JSON.parse(clean);
+    } catch {
+        throw new Error("AI returned malformed JSON: " + clean.slice(0, 200));
+    }
+
+    // Validate required top-level fields
+    if (!result.type || !result.reply || !result.action) {
+        throw new Error("AI response missing required fields (type, reply, action)");
+    }
+
+    // Ensure recipe object always exists
+    if (!result.recipe) {
+        result.recipe = {};
+    }
+
+    return result;
+};
+
 const chatWithAI = async (req, res) => {
     try {
-        const { message , recipe } = req.body;
+        const { message, recipe } = req.body;
 
-        if(!message || message.trim() === "") {
+        // --- Input validation ---
+        if (!message || typeof message !== "string" || message.trim() === "") {
             return res.status(400).json({
-                success : false,
-                message : "Message is required"
+                success: false,
+                message: "Message is required",
             });
         }
 
@@ -16,106 +67,140 @@ const chatWithAI = async (req, res) => {
         if (!apiKey) {
             return res.status(500).json({
                 success: false,
-                message: "GEMINI_API_KEY is not configured on the server."
+                message: "GEMINI_API_KEY is not configured on the server.",
             });
         }
 
         const ai = new GoogleGenAI({ apiKey });
 
-        const cleanRecipe = { ...recipe };
-        if (cleanRecipe.image && cleanRecipe.image.length > 200) {
+        // --- Clean recipe: strip large base64 images to avoid token overflow ---
+        const cleanRecipe = recipe ? { ...recipe } : {};
+        if (
+            cleanRecipe.image &&
+            typeof cleanRecipe.image === "string" &&
+            cleanRecipe.image.length > 500
+        ) {
             cleanRecipe.image = "uploaded_image_placeholder";
         }
 
+        const recipeStateStr =
+            cleanRecipe && Object.keys(cleanRecipe).length > 0
+                ? JSON.stringify(cleanRecipe)
+                : "Empty";
+
+        // --- Build prompt ---
         const prompt = `
-           You are an Expert AI Recipe Assistant and Professional Chef.
-           The user is building a recipe through conversation step-by-step.
+You are an Expert AI Recipe Assistant and Professional Chef.
+The user is building a recipe through conversation step-by-step.
 
-           Required Recipe Fields: Title, Description, Category, Cooking Time, Servings, Difficulty, Image, Ingredients, Instructions.
+Required Recipe Fields: title, description, category, cookingTime, servings, difficulty, image, ingredients, instructions.
 
-           Current Recipe State:
-           ${cleanRecipe && Object.keys(cleanRecipe).length > 0 ? JSON.stringify(cleanRecipe) : "Empty"}
+Current Recipe State:
+${recipeStateStr}
 
-           User Message:
-           ${message}
+User Message:
+${message.trim()}
 
-           ----------------------------------
-           RULES
-           ----------------------------------
+----------------------------------
+STRICT RULES
+----------------------------------
 
-           1. Extract any valid recipe fields provided by the user in their message and ADD them to the Current Recipe State. Understand natural language (e.g. "I want to make Pizza. It takes 30 mins" -> Title: Pizza, Cooking Time: 30 mins).
-           2. If the user asks to "Generate everything", generate realistic content for: description, cookingTime, servings, difficulty, ingredients, instructions. DO NOT generate category or image.
-           3. If the user asks to generate a specific missing field (e.g. "Generate ingredients"), generate it and add it to the state.
-           4. Determine the updated recipe state based on the rules above.
-           5. Check the updated recipe state to see which required fields are STILL MISSING.
-           6. If there are missing fields, choose the FIRST missing field and formulate a natural language question asking the user for it.
-              - If the missing field is "Category", your reply must ask them to choose a category, and set action to "ask_category". The valid category values are EXACTLY: Breakfast, Brunch, Lunch, Dinner, Dessert, Snacks, Beverages, Salad, Soup, Vegetarian, Non-Vegetarian, Vegan, Healthy, High-Protein, Quick Meals, Jain. Always use one of these exact values in the recipe object.
-              - If the missing field is "Difficulty", your reply must ask them to choose a difficulty level, and set action to "ask_difficulty". Valid values: Easy, Medium, Hard.
-              - If the missing field is "Image", your reply must ask them to upload an image, and set action to "ask_image".
-              - For all other missing fields, set action to "ask_text".
-              - Set type to "update".
-           7. If ALL required fields (Title, Description, Category, Cooking Time, Servings, Difficulty, Image, Ingredients, Instructions) are present, set type to "complete", reply "Your recipe is ready!", and action to "ready".
-           8. If the user wants to MODIFY a field, update the field in the recipe state, and then evaluate again what is missing (or complete).
-           9. If the message is a cooking question not related to building this recipe, just answer it and set type to "update", action to "ask_text".
-           10. If the message is completely unrelated to cooking, set type to "invalid", reply "Please enter a valid recipe or cooking related request.", and action to "ask_text".
+1. Extract any valid recipe fields from the user's message and merge them into the Current Recipe State. Understand natural language (e.g. "I want to make Pizza, it takes 30 mins" → title: "Pizza", cookingTime: 30).
+2. If the user says "Generate everything" or similar, generate realistic values for: description, cookingTime (number in minutes), servings (number), difficulty, ingredients (array), instructions (array). Do NOT generate category or image.
+3. If asked to generate a specific missing field (e.g. "Generate ingredients"), generate it and add to state.
+4. After updating the state, check which required fields are STILL MISSING (null, empty string, empty array, or not present).
+5. If there are missing fields, pick the FIRST missing one in this order: title, description, category, cookingTime, servings, difficulty, ingredients, instructions, image.
+   - Missing "category" → ask_category. Use EXACTLY one of: Breakfast, Brunch, Lunch, Dinner, Dessert, Snacks, Beverages, Salad, Soup, Vegetarian, Non-Vegetarian, Vegan, Healthy, High-Protein, Quick Meals, Jain
+   - Missing "difficulty" → ask_difficulty. Use EXACTLY one of: Easy, Medium, Hard
+   - Missing "image" → ask_image
+   - Any other missing field → ask_text
+   - Set type to "update"
+6. If ALL required fields are present and non-empty, set type to "complete", reply "Your recipe is ready! 🎉", action to "ready".
+7. Modifications: if user wants to change a field, update it and re-evaluate.
+8. Off-topic cooking questions: answer helpfully, type "update", action "ask_text", preserve recipe state.
+9. Completely unrelated to cooking: type "invalid", reply "Please ask something related to your recipe or cooking.", action "ask_text".
 
-           Return ONLY valid JSON in the following format:
-           {
-              "type": "update" | "complete" | "invalid",
-              "reply": "Your conversational response",
-              "action": "ask_text" | "ask_category" | "ask_difficulty" | "ask_image" | "ready",
-              "recipe": {
-                  "title": "...",
-                  "description": "...",
-                  "category": "...",
-                  "cookingTime": "...",
-                  "servings": "...",
-                  "difficulty": "...",
-                  "image": "...",
-                  "ingredients": ["..."],
-                  "instructions": ["..."]
-              }
-           }
+IMPORTANT FIELD TYPES:
+- cookingTime MUST be a number (minutes), not a string.
+- servings MUST be a number, not a string.
+- ingredients MUST be an array of strings.
+- instructions MUST be an array of strings.
+- category MUST be one of the exact values listed above.
+- difficulty MUST be one of: Easy, Medium, Hard.
 
-           IMPORTANT: Return ONLY JSON. Never return markdown. Never use \`\`\`json. The "recipe" object MUST contain ALL fields you currently know about.
-        `;
+Return ONLY valid JSON. No markdown. No \`\`\`json. No explanation outside JSON.
 
-        const response = await ai.models.generateContent({
-            model: "gemini-2.0-flash",
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json"
+{
+  "type": "update" | "complete" | "invalid",
+  "reply": "Your conversational response here",
+  "action": "ask_text" | "ask_category" | "ask_difficulty" | "ask_image" | "ready",
+  "recipe": {
+    "title": "string or null",
+    "description": "string or null",
+    "category": "string or null",
+    "cookingTime": number_or_null,
+    "servings": number_or_null,
+    "difficulty": "string or null",
+    "image": "string or null",
+    "ingredients": ["string"] or [],
+    "instructions": ["string"] or []
+  }
+}
+`;
+
+        // --- Attempt with primary model, fallback to secondary ---
+        let response = null;
+        let lastError = null;
+
+        for (const model of MODELS) {
+            try {
+                console.log(`[AI Chat] Trying model: ${model}`);
+                response = await withTimeout(attemptGenerate(ai, model, prompt), 25000);
+                console.log(`[AI Chat] Success with model: ${model}`);
+                break;
+            } catch (err) {
+                console.warn(`[AI Chat] Model ${model} failed:`, err.message);
+                lastError = err;
             }
-        });
+        }
 
-        let text = response.text.trim();
+        if (!response) {
+            throw lastError || new Error("All AI models failed");
+        }
 
-        text = text.replace(/```json/g, "");
-        text = text.replace(/```/g, "").trim();
-
-        const result = JSON.parse(text);
+        // --- Parse and validate response ---
+        const result = parseAIResponse(response.text);
 
         return res.status(200).json(result);
-
     } catch (error) {
-
-        console.error("AI Chat Error:", error);
-
-        const statusCode = error?.status || 500;
-        const errorMessage =
-            error?.errorDetails?.[0]?.message ||
-            error?.message ||
-            "AI Chat Failed";
-
-        res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 500).json({
-            success: false,
-            message: errorMessage
+        console.error("[AI Chat Error]", {
+            message: error.message,
+            status: error?.status,
+            stack: error?.stack?.split("\n")[0],
         });
 
+        const statusCode =
+            error?.status >= 400 && error?.status < 600 ? error.status : 500;
+
+        // Map specific Gemini error codes to user-friendly messages
+        let userMessage = "AI Chat Failed. Please try again.";
+        if (error?.status === 429) {
+            userMessage = "AI is busy right now. Please wait a moment and try again.";
+        } else if (error?.status === 503) {
+            userMessage = "AI service is temporarily unavailable. Please try again shortly.";
+        } else if (error.message?.includes("timed out")) {
+            userMessage = "AI took too long to respond. Please try again.";
+        } else if (error.message?.includes("malformed JSON")) {
+            userMessage = "AI returned an unexpected response. Please try again.";
+        } else if (error?.status === 404) {
+            userMessage = "AI model not available. Please contact support.";
+        }
+
+        res.status(statusCode === 429 ? 503 : statusCode).json({
+            success: false,
+            message: userMessage,
+        });
     }
-
 };
 
-module.exports = {
-    chatWithAI
-};
+module.exports = { chatWithAI };
