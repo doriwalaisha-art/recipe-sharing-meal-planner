@@ -1,10 +1,6 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-const ai = new GoogleGenAI({
-    apiKey : process.env.GEMINI_API_KEY
-});
-
 const chatWithAI = async (req, res) => {
     try {
         const { message , recipe } = req.body;
@@ -15,6 +11,16 @@ const chatWithAI = async (req, res) => {
                 message : "Message is required"
             });
         }
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            return res.status(500).json({
+                success: false,
+                message: "GEMINI_API_KEY is not configured on the server."
+            });
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
 
         const cleanRecipe = { ...recipe };
         if (cleanRecipe.image && cleanRecipe.image.length > 200) {
@@ -44,7 +50,7 @@ const chatWithAI = async (req, res) => {
            5. Check the updated recipe state to see which required fields are STILL MISSING.
            6. If there are missing fields, choose the FIRST missing field and formulate a natural language question asking the user for it.
               - If the missing field is "Category", your reply must ask them to choose a category, and set action to "ask_category". The valid category values are EXACTLY: Breakfast, Brunch, Lunch, Dinner, Dessert, Snacks, Beverages, Salad, Soup, Vegetarian, Non-Vegetarian, Vegan, Healthy, High-Protein, Quick Meals, Jain. Always use one of these exact values in the recipe object.
-              - If the missing field is "Difficulty", your reply must ask them to choose a difficulty level, and set action to "ask_difficulty".
+              - If the missing field is "Difficulty", your reply must ask them to choose a difficulty level, and set action to "ask_difficulty". Valid values: Easy, Medium, Hard.
               - If the missing field is "Image", your reply must ask them to upload an image, and set action to "ask_image".
               - For all other missing fields, set action to "ask_text".
               - Set type to "update".
@@ -75,7 +81,7 @@ const chatWithAI = async (req, res) => {
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-3.5-flash",
+            model: "gemini-2.0-flash",
             contents: prompt,
             config: {
                 responseMimeType: "application/json"
@@ -93,11 +99,17 @@ const chatWithAI = async (req, res) => {
 
     } catch (error) {
 
-        console.log(error);
+        console.error("AI Chat Error:", error);
 
-        res.status(500).json({
+        const statusCode = error?.status || 500;
+        const errorMessage =
+            error?.errorDetails?.[0]?.message ||
+            error?.message ||
+            "AI Chat Failed";
+
+        res.status(statusCode >= 400 && statusCode < 600 ? statusCode : 500).json({
             success: false,
-            message: "AI Chat Failed"
+            message: errorMessage
         });
 
     }
@@ -107,4 +119,3 @@ const chatWithAI = async (req, res) => {
 module.exports = {
     chatWithAI
 };
-    
