@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import  { useState, useEffect, useRef } from "react";
 import { Sparkles, Bot, User, CornerDownLeft, RotateCcw, Save, Play, Check, RefreshCw, Upload } from "lucide-react";
 import API from "../api/axios";
 import { toast } from "react-toastify";
@@ -6,15 +6,14 @@ import { useNavigate } from "react-router-dom";
 
 const STEPS = [
     { key: "title", question: "What is the name of the recipe you want to create?", placeholder: "e.g., Paneer Butter Masala", chips: ["Butter Chicken", "Masala Dosa", "Veg Biryani", "Pasta Carbonara"] },
-    { key: "foodType", question: "What is the food type?", chips: ["Veg", "Non-Veg", "Vegan", "Jain"] },
     { key: "category", question: "Select the Category for your recipe:", chips: ['Breakfast','Brunch','Lunch','Snacks','Dinner','Dessert','Beverages','Salad','Soup','Vegetarian','Non-Vegetarian','Vegan','Healthy','High-Protein','Quick Meals','Jain'] },
-    { key: "cuisine", question: "What is the cuisine?", chips: ["Indian", "Italian", "Chinese", "Mexican", "Thai", "Mediterranean"] },
+    { key: "description", question: "Describe your recipe briefly (or select 'Let AI Generate'):", placeholder: "e.g., A rich and creamy classic North Indian dish...", chips: ["Let AI Generate"] },
     { key: "cookingTime", question: "What is the estimated cooking time (in minutes)?", placeholder: "e.g., 30", chips: ["15", "30", "45", "60"] },
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
     { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
-    { key: "spiceLevel", question: "Select the spice level:", chips: ["Mild", "Medium", "Hot", "Extra Hot"] },
-    { key: "notes", question: "Any special notes or dietary preferences?", placeholder: "e.g., Gluten-free, Low-fat, Extra garlic... (or write 'None')", chips: ["None", "Gluten-free", "Dairy-free", "Low calorie"] },
-    { key: "image", question: "Please upload an image for your recipe:", chips: [] } // Step 10: Image upload
+    { key: "ingredients", question: "List your ingredients separated by commas (or select 'Let AI Generate'):", placeholder: "e.g., 200g paneer, 2 tomatoes, 1 tbsp butter, cream...", chips: ["Let AI Generate"] },
+    { key: "instructions", question: "Describe step-by-step instructions (or select 'Let AI Generate'):", placeholder: "e.g., 1. Fry paneer. 2. Make tomato gravy. 3. Mix and simmer...", chips: ["Let AI Generate"] },
+    { key: "image", question: "Please upload an image for your recipe:", chips: [] } // Step 9: Image upload
 ];
 
 const LOADING_MESSAGES = [
@@ -40,7 +39,7 @@ const AIRecipeStudio = () => {
     const [recipeDraft, setRecipeDraft] = useState(() => {
         const saved = localStorage.getItem("ai_studio_draft");
         return saved ? JSON.parse(saved) : {
-            title: "", foodType: "", category: "", cuisine: "", cookingTime: "", servings: "", difficulty: "", spiceLevel: "", notes: ""
+            title: "", category: "", description: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
         };
     });
     const [messages, setMessages] = useState(() => {
@@ -197,7 +196,7 @@ const AIRecipeStudio = () => {
             setStarted(false);
             setCurrentStepIndex(0);
             setRecipeDraft({
-                title: "", foodType: "", category: "", cuisine: "", cookingTime: "", servings: "", difficulty: "", spiceLevel: "", notes: ""
+                title: "", category: "", description: "", cookingTime: "", servings: "", difficulty: "", ingredients: "", instructions: ""
             });
             setSelectedImage(null);
             setMessages([

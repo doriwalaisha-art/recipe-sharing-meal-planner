@@ -102,20 +102,33 @@ const chatWithAI = async (req, res) => {
         let prompt = "";
 
         if (action === "generate") {
+            const userDescription = (recipeDraft.description && recipeDraft.description !== "Let AI Generate") 
+                ? `Use this description: "${recipeDraft.description}"` 
+                : "Generate an appetizing description.";
+
+            const userIngredients = (recipeDraft.ingredients && recipeDraft.ingredients !== "Let AI Generate")
+                ? `Use these specific ingredients: ${recipeDraft.ingredients}`
+                : "Generate realistic ingredients with exact quantities.";
+
+            const userInstructions = (recipeDraft.instructions && recipeDraft.instructions !== "Let AI Generate")
+                ? `Use these specific instructions/steps as a base: ${recipeDraft.instructions}`
+                : "Generate step-by-step instructions.";
+
             prompt = `
 You are a Professional Chef and AI Recipe Generator.
 Generate a complete, high-quality recipe matching the details below.
 
 Recipe Details:
 - Title: ${recipeDraft.title}
-- Food Type: ${recipeDraft.foodType || "Veg"}
 - Category: ${recipeDraft.category || "Dinner"}
-- Cuisine: ${recipeDraft.cuisine || "Indian"}
 - Cooking Time: ${recipeDraft.cookingTime || "30"} minutes
 - Servings: ${recipeDraft.servings || "2"}
 - Difficulty: ${recipeDraft.difficulty || "Medium"}
-- Spice Level: ${recipeDraft.spiceLevel || "Medium"}
-- Special Notes: ${recipeDraft.notes || "None"}
+
+Requirements:
+1. Description: ${userDescription}
+2. Ingredients: ${userIngredients}
+3. Instructions: ${userInstructions}
 
 Strictly return ONLY a valid JSON object. No explanations. No markdown formatting.
 JSON schema:
