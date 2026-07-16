@@ -1,8 +1,8 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-// Model configuration with robust fallbacks to prevent 404 and region-specific failures
-const MODELS = ["gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+// Model configuration with gemini-flash-latest as the primary stable model to prevent 404 errors
+const MODELS = ["gemini-flash-latest", "gemini-3.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
 // Timeout wrapper: rejects after ms milliseconds
 const withTimeout = (promise, ms) =>
