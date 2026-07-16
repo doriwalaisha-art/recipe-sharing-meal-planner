@@ -1,0 +1,212 @@
+const { GoogleGenAI } = require("@google/genai");
+
+const MODEL_NAME = "gemini-flash-latest";
+
+const withTimeout = (promise, ms) =>
+    Promise.race([
+        promise,
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error(`AI request timed out after ${ms / 1000}s`)), ms)
+        ),
+    ]);
+
+// Helper to clean Markdown wrapper
+const parseJSONResponse = (text) => {
+    let clean = text
+        .replace(/```json/gi, "")
+        .replace(/```/g, "")
+        .trim();
+    return JSON.parse(clean);
+};
+
+const chatWithAI = async (req, res) => {
+    try {
+        const { action, recipeDraft, currentRecipe, instruction, variation, fieldToRegenerate } = req.body;
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (!apiKey) {
+            return res.status(500).json({
+                success: false,
+                message: "GEMINI_API_KEY is not configured on the server."
+            });
+        }
+
+        const ai = new GoogleGenAI({ apiKey });
+        let prompt = "";
+
+        if (action === "generate") {
+            prompt = `
+You are a Professional Chef and AI Recipe Generator.
+Your task is to take the following recipe draft details and generate a complete, high-quality, professional food recipe.
+
+Recipe Draft Details:
+${JSON.stringify(recipeDraft, null, 2)}
+
+Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
+
+{
+  "title": "Clean Title of the Recipe",
+  "description": "Short, engaging, appetizing description of the dish.",
+  "cookingTime": ${recipeDraft.cookingTime ? parseInt(recipeDraft.cookingTime) : 30},
+  "servings": ${recipeDraft.servings ? parseInt(recipeDraft.servings) : 2},
+  "difficulty": "${recipeDraft.difficulty || "Medium"}",
+  "estimatedCalories": 350,
+  "ingredients": [
+    "exact quantity and ingredient (e.g. 2 cups Basmati Rice)",
+    "exact quantity and ingredient"
+  ],
+  "instructions": [
+    "Step-by-step instruction 1",
+    "Step-by-step instruction 2"
+  ],
+  "tips": [
+    "Chef tip 1",
+    "Chef tip 2"
+  ],
+  "nutrition": {
+    "protein": "15g",
+    "carbs": "45g",
+    "fat": "10g",
+    "fiber": "4g"
+  },
+  "tags": ["Tag1", "Tag2"]
+}
+`;
+        } else if (action === "edit") {
+            prompt = `
+You are a Professional Chef. Modifying an existing recipe based on the user's instruction.
+Modify ONLY the necessary parts of the recipe based on the instruction. Preserve the other parts.
+
+Current Recipe:
+${JSON.stringify(currentRecipe, null, 2)}
+
+User Instruction:
+"${instruction}"
+
+Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
+
+{
+  "title": "Clean Title",
+  "description": "Appetizing description.",
+  "cookingTime": 30,
+  "servings": 2,
+  "difficulty": "Medium",
+  "estimatedCalories": 350,
+  "ingredients": [
+    "ingredient list updated according to the instruction"
+  ],
+  "instructions": [
+    "instructions list updated according to the instruction"
+  ],
+  "tips": [
+    "tips updated according to the instruction"
+  ],
+  "nutrition": {
+    "protein": "updated value",
+    "carbs": "updated value",
+    "fat": "updated value",
+    "fiber": "updated value"
+  },
+  "tags": ["updated tags"]
+}
+`;
+        } else if (action === "variation") {
+            prompt = `
+You are a Professional Chef. Convert the following recipe into a "${variation}" variation (e.g., Jain style, Dhaba Style, High Protein, Healthy, Low Oil, Restaurant Style).
+Adjust ingredients, instructions, tips, and nutrition fields appropriately.
+
+Current Recipe:
+${JSON.stringify(currentRecipe, null, 2)}
+
+Strictly output ONLY valid JSON matching this schema. Do not output any other text, markdown blocks, or explanation.
+
+{
+  "title": "New Title representing the variation (e.g. Dhaba Style Paneer)",
+  "description": "Appetizing description for this variation.",
+  "cookingTime": 30,
+  "servings": 2,
+  "difficulty": "Medium",
+  "estimatedCalories": 350,
+  "ingredients": [
+    "ingredient list adapted for the variation"
+  ],
+  "instructions": [
+    "instructions Adapted for the variation"
+  ],
+  "tips": [
+    "tips tailored for the variation"
+  ],
+  "nutrition": {
+    "protein": "updated value",
+    "carbs": "updated value",
+    "fat": "updated value",
+    "fiber": "updated value"
+  },
+  "tags": ["updated tags"]
+}
+`;
+        } else if (action === "regenerate_field") {
+            prompt = `
+You are a Professional Chef. You need to regenerate ONLY the field "${fieldToRegenerate}" (which can be either "ingredients", "instructions", or "entire") for the current recipe.
+If it is "entire", completely regenerate a fresh version of the recipe.
+If it is "ingredients" or "instructions", improve or vary that specific array while keeping the rest of the recipe the same.
+
+Current Recipe:
+${JSON.stringify(currentRecipe, null, 2)}
+
+Strictly output ONLY valid JSON matching the full recipe schema.
+
+{
+  "title": "Title",
+  "description": "Description",
+  "cookingTime": 30,
+  "servings": 2,
+  "difficulty": "Medium",
+  "estimatedCalories": 350,
+  "ingredients": [
+    "ingredients list"
+  ],
+  "instructions": [
+    "instructions list"
+  ],
+  "tips": [
+    "tips list"
+  ],
+  "nutrition": {
+    "protein": "value",
+    "carbs": "value",
+    "fat": "value",
+    "fiber": "value"
+  },
+  "tags": ["tags"]
+}
+`;
+        } else {
+            return res.status(400).json({ success: false, message: "Invalid action type." });
+        }
+
+        const response = await withTimeout(
+            ai.models.generateContent({
+                model: MODEL_NAME,
+                contents: prompt,
+                config: {
+                    responseMimeType: "application/json",
+                    maxOutputTokens: 2548
+                }
+            }),
+            30000
+        );
+
+        const result = parseJSONResponse(response.text);
+        return res.status(200).json({ success: true, recipe: result });
+
+    } catch (error) {
+        console.error("[AI Chat Studio Error]", error);
+        return res.status(500).json({
+            success: false,
+            message: error.message || "Failed to process AI chat request."
+        });
+    }
+};
+
+module.exports = { chatWithAI };
