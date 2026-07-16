@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { GoogleGenAI } = require("@google/genai");
 
-const MODELS = ["gemini-2.5-flash", "gemini-2.5-pro"];
+const MODELS = ["gemini-3.5-flash", "gemini-3.1-flash"];
 
 const withTimeout = (promise, ms) =>
     Promise.race([
