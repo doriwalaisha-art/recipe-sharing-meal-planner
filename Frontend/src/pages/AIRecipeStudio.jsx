@@ -4,7 +4,6 @@ import { Sparkles } from 'lucide-react';
 import { toast } from "react-toastify";
 import { useNavigate } from "react-router-dom";
 import ChatWindow from "../components/AIRecipeStudio/ChatWindow";
-import RecipePreview from "../components/AIRecipeStudio/RecipePreview";
 
 const CATEGORIES = [
     { _id: 1, name: "Breakfast" },
@@ -46,7 +45,6 @@ const AIRecipeStudio = () => {
     const navigate = useNavigate();
     const abortRef = useRef(null);
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (abortRef.current) abortRef.current.abort();
@@ -107,7 +105,6 @@ const AIRecipeStudio = () => {
         setMessages(prev => [...prev, userMessage]);
         setIsTyping(true);
 
-        // Cancel any ongoing request
         if (abortRef.current) abortRef.current.abort();
         const controller = new AbortController();
         abortRef.current = controller;
@@ -118,15 +115,9 @@ const AIRecipeStudio = () => {
                 recipe: recipe || {},
             }, { signal: controller.signal });
 
-            // Update recipe state on any non-invalid response
             if (data.type !== "invalid" && data.recipe) {
-                // Only replace recipe.image with placeholder — never store base64 in recipe state
                 const updatedRecipe = { ...data.recipe };
-                if (
-                    updatedRecipe.image &&
-                    typeof updatedRecipe.image === "string" &&
-                    updatedRecipe.image.length > 500
-                ) {
+                if (updatedRecipe.image && typeof updatedRecipe.image === "string" && updatedRecipe.image.length > 500) {
                     updatedRecipe.image = "uploaded_image_placeholder";
                 }
                 setRecipe(updatedRecipe);
@@ -142,33 +133,19 @@ const AIRecipeStudio = () => {
             ]);
         } catch (error) {
             if (error.name === "CanceledError" || error.name === "AbortError") return;
-
-            console.error("[Send Message Error]", error);
-            const errMsg =
-                error.response?.data?.message ||
-                (error.message?.includes("timeout") ? "Request timed out. Please try again." : "Something went wrong. Please try again.");
-
-            setMessages(prev => [
-                ...prev,
-                { sender: "ai", text: errMsg, action: "ask_text" },
-            ]);
+            const errMsg = error.response?.data?.message || "Something went wrong. Please try again.";
+            setMessages(prev => [...prev, { sender: "ai", text: errMsg, action: "ask_text" }]);
         } finally {
             setIsTyping(false);
         }
     };
 
-    const handleCategorySelect = (catName) => {
-        sendMessage(`I choose the category: ${catName}`);
-    };
-
-    const handleDifficultySelect = (diffName) => {
-        sendMessage(`I choose the difficulty: ${diffName}`);
-    };
+    const handleCategorySelect = (catName) => sendMessage(`I choose the category: ${catName}`);
+    const handleDifficultySelect = (diffName) => sendMessage(`I choose the difficulty: ${diffName}`);
 
     const handleImageSelect = (file) => {
         if (!file) return;
         setSelectedImage(file);
-        // Update recipe state with placeholder only — never base64
         setRecipe(prev => ({ ...(prev || {}), image: "uploaded_image_placeholder" }));
         sendMessage("I have uploaded the recipe image.");
     };
@@ -176,7 +153,7 @@ const AIRecipeStudio = () => {
     return (
         <div className="min-h-screen bg-bgLight px-4 md:px-6 py-8">
             {/* Header */}
-            <div className="max-w-7xl mx-auto mb-6">
+            <div className="max-w-3xl mx-auto mb-6">
                 <div className="flex items-center gap-3">
                     <div className="bg-primary text-white p-3 rounded-2xl shadow-lg">
                         <Sparkles size={28} />
@@ -186,15 +163,14 @@ const AIRecipeStudio = () => {
                             AI Recipe Studio
                         </h1>
                         <p className="text-gray-500 mt-1">
-                            Describe, create, and edit recipes using AI.
+                            Describe your recipe and let AI build it for you.
                         </p>
                     </div>
                 </div>
             </div>
 
-            {/* Two-column layout */}
-            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Chat Panel */}
+            {/* Chat — centered, full width on mobile */}
+            <div className="max-w-3xl mx-auto">
                 <ChatWindow
                     messages={messages}
                     sendMessage={sendMessage}
@@ -206,18 +182,6 @@ const AIRecipeStudio = () => {
                     handleCategorySelect={handleCategorySelect}
                     handleDifficultySelect={handleDifficultySelect}
                     setSelectedImage={handleImageSelect}
-                />
-
-                {/* Recipe Preview Panel */}
-                <RecipePreview
-                    recipe={recipe}
-                    onCreateRecipe={handleCreateRecipe}
-                    isCreating={isCreating}
-                    selectedImage={selectedImage}
-                    setSelectedImage={handleImageSelect}
-                    categories={CATEGORIES}
-                    selectedCategory={recipe?.category || ""}
-                    setSelectedCategory={(cat) => setRecipe(prev => ({ ...(prev || {}), category: cat }))}
                 />
             </div>
         </div>
