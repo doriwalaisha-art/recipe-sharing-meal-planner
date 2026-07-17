@@ -67,16 +67,16 @@ const generateRecipe = async (req, res) => {
 
         // --- Step 1: Validate it's a food recipe ---
         const validationPrompt = `
-You are a food validation assistant.
-Determine whether the following title and description describe a real food recipe.
+            You are a food validation assistant.
+            Determine whether the following title and description describe a real food recipe.
 
-Recipe Title: ${title}
-Recipe Description: ${description || "No description"}
+            Recipe Title: ${title}
+            Recipe Description: ${description || "No description"}
 
-Reply with ONLY one word: YES or NO.
-YES → if the title and description are about a food recipe or dish.
-NO → if they are names of people, places, random words, meaningless text, numbers, greetings, objects, animals, movies, sports, or anything that is not a recipe.
-`;
+            Reply with ONLY one word: YES or NO.
+            YES → if the title and description are about a food recipe or dish.
+            NO → if they are names of people, places, random words, meaningless text, numbers, greetings, objects, animals, movies, sports, or anything that is not a recipe.
+        `;
 
         console.log(`[AI Generate] Requesting validation using model: ${CURRENT_MODEL}`);
         const validationResponse = await attemptGenerateWithRetry(
@@ -88,7 +88,10 @@ NO → if they are names of people, places, random words, meaningless text, numb
             15000
         );
 
-        const validation = validationResponse.text.trim().toUpperCase();
+        // const validation = validationResponse.text.trim().toUpperCase();
+        console.log("Validation Response:", validationResponse);
+        console.log("Validation Response.text:", validationResponse.text);
+        console.log("Type:", typeof validationResponse.text);
         if (validation !== "YES") {
             return res.status(400).json({
                 success: false,
@@ -98,25 +101,25 @@ NO → if they are names of people, places, random words, meaningless text, numb
 
         // --- Step 2: Generate recipe ---
         const prompt = `
-You are an expert chef and recipe generator.
+            You are an expert chef and recipe generator.
 
-Recipe Title: ${title}
-Recipe Description: ${description || "No description provided"}
+            Recipe Title: ${title}
+            Recipe Description: ${description || "No description provided"}
 
-Rules:
-1. Generate suitable ingredients and cooking instructions for this recipe.
-2. Ingredients must contain ingredient names with quantities.
-3. Instructions must be short, clear, and beginner-friendly.
-4. Each instruction contains only one cooking action.
-5. Do NOT generate stories, tips, notes, or nutrition facts.
-6. Return ONLY valid JSON. No markdown. No \`\`\`json.
+            Rules:
+            1. Generate suitable ingredients and cooking instructions for this recipe.
+            2. Ingredients must contain ingredient names with quantities.
+            3. Instructions must be short, clear, and beginner-friendly.
+            4. Each instruction contains only one cooking action.
+            5. Do NOT generate stories, tips, notes, or nutrition facts.
+            6. Return ONLY valid JSON. No markdown. No \`\`\`json.
 
-{
-  "success": true,
-  "ingredients": ["Ingredient 1", "Ingredient 2"],
-  "instructions": ["Step 1", "Step 2"]
-}
-`;
+            {
+              "success": true,
+              "ingredients": ["Ingredient 1", "Ingredient 2"],
+              "instructions": ["Step 1", "Step 2"]
+            }
+        `;
 
         console.log(`[AI Generate] Generating recipe using model: ${CURRENT_MODEL}`);
         const recipeResponse = await attemptGenerateWithRetry(
