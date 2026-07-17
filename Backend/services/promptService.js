@@ -1,4 +1,4 @@
-// Prompt Builder Service
+
 const buildPromptForChat = (body) => {
     const { action, recipeDraft, currentRecipe, instruction, variation, fieldToRegenerate } = body;
 

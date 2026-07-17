@@ -6,16 +6,13 @@ import { useNavigate } from "react-router-dom";
 
 const STEPS = [
     { key: "title", question: "What is the name of the recipe you want to create?", placeholder: "e.g., Paneer Butter Masala", chips: ["Butter Chicken", "Masala Dosa", "Veg Biryani", "Pasta Carbonara"] },
-    { key: "descriptionChoice", question: "Would you like to write the description yourself or generate it using AI?", chips: ["Write Myself", "Generate with AI"] },
     { key: "description", question: "Please enter the description of your recipe:", placeholder: "e.g., A rich and creamy classic North Indian dish..." },
     { key: "category", question: "Select the Category for your recipe:", chips: ['Breakfast','Brunch','Lunch','Snacks','Dinner','Dessert','Beverages','Salad','Soup','Vegetarian','Non-Vegetarian','Vegan','Healthy','High-Protein','Quick Meals','Jain'] },
     { key: "cookingTime", question: "What is the estimated cooking time (in minutes)?", placeholder: "e.g., 30", chips: ["15", "30", "45", "60"] },
     { key: "servings", question: "How many servings?", placeholder: "e.g., 2", chips: ["1", "2", "4", "6"] },
     { key: "difficulty", question: "Select the difficulty level:", chips: ["Easy", "Medium", "Hard"] },
     { key: "image", question: "Please upload an image for your recipe:", chips: [] },
-    { key: "ingredientsChoice", question: "Would you like to write ingredients yourself or generate with AI?", chips: ["Write Myself", "Generate with AI"] },
     { key: "ingredients", question: "List your ingredients separated by commas:", placeholder: "e.g., 200g paneer, 2 tomatoes, 1 tbsp butter, cream..." },
-    { key: "instructionsChoice", question: "Would you like to write cooking instructions yourself or generate with AI?", chips: ["Write Myself", "Generate with AI"] },
     { key: "instructions", question: "Describe step-by-step instructions:", placeholder: "e.g., 1. Fry paneer. 2. Make tomato gravy. 3. Mix and simmer..." }
 ];
 
@@ -32,16 +29,13 @@ const LOADING_MESSAGES = [
 const getStageNumber = (key) => {
     switch (key) {
         case "title": return 1;
-        case "descriptionChoice":
         case "description": return 2;
         case "category": return 3;
         case "cookingTime": return 4;
         case "servings": return 5;
         case "difficulty": return 6;
         case "image": return 7;
-        case "ingredientsChoice":
         case "ingredients": return 8;
-        case "instructionsChoice":
         case "instructions": return 9;
         default: return 9;
     }
@@ -147,24 +141,6 @@ const AIRecipeStudio = () => {
         const nextDraft = { ...recipeDraft, [currentStep.key]: text };
         
         let nextStepIndex = currentStepIndex + 1;
-        
-        // Handle conditional path choices and skipping
-        if (currentStep.key === "descriptionChoice") {
-            if (text === "Generate with AI") {
-                nextDraft.description = "__AUTO__";
-                nextStepIndex = STEPS.findIndex(s => s.key === "category");
-            }
-        } else if (currentStep.key === "ingredientsChoice") {
-            if (text === "Generate with AI") {
-                nextDraft.ingredients = "__AUTO__";
-                nextStepIndex = STEPS.findIndex(s => s.key === "instructionsChoice");
-            }
-        } else if (currentStep.key === "instructionsChoice") {
-            if (text === "Generate with AI") {
-                nextDraft.instructions = "__AUTO__";
-                nextStepIndex = STEPS.length; // Complete
-            }
-        }
 
         setRecipeDraft(nextDraft);
 
@@ -190,7 +166,6 @@ const AIRecipeStudio = () => {
         const updatedMessages = [...messages, { sender: "user", text: `📸 Uploaded image: ${file.name}` }];
         setMessages(updatedMessages);
 
-        // Proceed directly to Step 8 (ingredientsChoice)
         const nextStepIndex = currentStepIndex + 1;
         setCurrentStepIndex(nextStepIndex);
         setStepHistory((prev) => [...prev, nextStepIndex]);

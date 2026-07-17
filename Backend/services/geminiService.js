@@ -2,7 +2,7 @@ const { GoogleGenAI } = require("@google/genai");
 const geminiConfig = require("../config/gemini");
 const { withTimeout } = require("../utils/timeout");
 
-// Attempt generation and fall back to fallback model on 404
+
 const generateContent = async (ai, prompt, model) => {
     try {
         const response = await ai.models.generateContent({
@@ -15,7 +15,7 @@ const generateContent = async (ai, prompt, model) => {
         });
         return response;
     } catch (error) {
-        // Fallback model support
+     
         if (error.status === 404 && model === geminiConfig.currentModel) {
             console.warn(`[Gemini Service] Model ${model} not available. Falling back to ${geminiConfig.fallbackModel}...`);
             return generateContent(ai, prompt, geminiConfig.fallbackModel);
@@ -24,7 +24,7 @@ const generateContent = async (ai, prompt, model) => {
     }
 };
 
-// Retry helper for 429, timeouts, and network issues
+
 const callGeminiWithRetry = async (apiKey, prompt, retries = 2, delayMs = 2000) => {
     const ai = new GoogleGenAI({ apiKey });
     

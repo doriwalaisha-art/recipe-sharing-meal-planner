@@ -1,4 +1,4 @@
-// Helper to race a promise against a timeout duration
+
 const withTimeout = (promise, ms) => {
     return Promise.race([
         promise,
