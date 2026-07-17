@@ -3,7 +3,7 @@ const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
 
 ai.models.generateContent({
-    model: 'gemini-3.5-flash',
+    model: 'gemini-2.5-flash',
     contents: 'I want to make pizza',
     config: {
         responseMimeType: 'application/json'

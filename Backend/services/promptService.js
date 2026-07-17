@@ -16,72 +16,73 @@ const buildPromptForChat = (body) => {
             : "Generate step-by-step instructions.";
 
         return `
-You are a Professional Chef. Generate a recipe JSON matching the details below.
+        
+        - Title: ${recipeDraft.title}
+        - Category: ${recipeDraft.category || "Dinner"}
+        - Cooking Time: ${recipeDraft.cookingTime || "30"} minutes
+        - Servings: ${recipeDraft.servings || "2"}
+        - Difficulty: ${recipeDraft.difficulty || "Medium"}
+        Requirements:
+        1. Description: ${userDescription}
+        2. Ingredients: ${userIngredients}
+        3. Instructions: ${userInstructions}
+        Strictly return ONLY valid JSON matching this schema:
+        {
+            "title": "${recipeDraft.title}",
+            "description": "Appetizing description.",
+            "cookingTime": ${recipeDraft.cookingTime ? parseInt(recipeDraft.cookingTime) : 30},
+            "servings": ${recipeDraft.servings ? parseInt(recipeDraft.servings) : 2},
+            "difficulty": "${recipeDraft.difficulty || "Medium"}",
+            "estimatedCalories": "350 kcal",
+            "ingredients": ["2 cups Basmati Rice"],
+            "instructions": ["Step 1"],
+            "tips": ["Chef tip 1"],
+            You are a Professional Chef. Generate a recipe JSON matching the details below.Recipe Details:
+            "nutrition": {"protein": "15g", "carbs": "45g", "fat": "10g", "fiber": "4g"},
 
-Recipe Details:
-- Title: ${recipeDraft.title}
-- Category: ${recipeDraft.category || "Dinner"}
-- Cooking Time: ${recipeDraft.cookingTime || "30"} minutes
-- Servings: ${recipeDraft.servings || "2"}
-- Difficulty: ${recipeDraft.difficulty || "Medium"}
+            "tags": ["Tag1"]
+            }
+            `;
 
-Requirements:
-1. Description: ${userDescription}
-2. Ingredients: ${userIngredients}
-3. Instructions: ${userInstructions}
 
-Strictly return ONLY valid JSON matching this schema:
-{
-  "title": "${recipeDraft.title}",
-  "description": "Appetizing description.",
-  "cookingTime": ${recipeDraft.cookingTime ? parseInt(recipeDraft.cookingTime) : 30},
-  "servings": ${recipeDraft.servings ? parseInt(recipeDraft.servings) : 2},
-  "difficulty": "${recipeDraft.difficulty || "Medium"}",
-  "estimatedCalories": "350 kcal",
-  "ingredients": ["2 cups Basmati Rice"],
-  "instructions": ["Step 1"],
-  "tips": ["Chef tip 1"],
-  "nutrition": {"protein": "15g", "carbs": "45g", "fat": "10g", "fiber": "4g"},
-  "tags": ["Tag1"]
-}
-`;
-    }
+            if (action === "edit") {
+            
+                return `
+                You are a Professional Chef. Modify the existing recipe based on the user's instruction. Preserve all other parts.
 
-    if (action === "edit") {
-        return `
-You are a Professional Chef. Modify the existing recipe based on the user's instruction. Preserve all other parts.
+                }
+                Current Recipe:
+                ${JSON.stringify(currentRecipe, null, 2)}
 
-Current Recipe:
-${JSON.stringify(currentRecipe, null, 2)}
+                User Instruction:
+                "${instruction}"
 
-User Instruction:
-"${instruction}"
-
-Strictly return ONLY a valid JSON object matching the schema.
-`;
-    }
+                Strictly return ONLY a valid JSON object matching the schema.
+                `;
+            }
 
     if (action === "variation") {
         return `
-You are a Professional Chef. Convert the following recipe into a "${variation}" variation.
+            You are a Professional Chef. Convert the following recipe into a "${variation}" variation.
 
-Current Recipe:
-${JSON.stringify(currentRecipe, null, 2)}
+            Current Recipe:
+            ${JSON.stringify(currentRecipe, null, 2)}
 
-Strictly return ONLY a valid JSON object matching the schema.
-`;
-    }
+            Strictly return ONLY a valid JSON object matching the schema.
+            `;
+        }
 
     if (action === "regenerate_field") {
         return `
-You are a Professional Chef. Regenerate ONLY the field "${fieldToRegenerate}" (ingredients, instructions, or entire) for the current recipe.
+        You are a Professional Chef. Regenerate ONLY the field "${fieldToRegenerate}" (ingredients, instructions, or entire) for the current recipe.
 
-Current Recipe:
-${JSON.stringify(currentRecipe, null, 2)}
+        Current Recipe:
+        ${JSON.stringify(currentRecipe, null, 2)}
 
-Strictly return ONLY a valid JSON object matching the schema.
-`;
+        Strictly return ONLY a valid JSON object matching the schema.
+        `;
     }
+}
 
     throw new Error("Invalid action type.");
 };

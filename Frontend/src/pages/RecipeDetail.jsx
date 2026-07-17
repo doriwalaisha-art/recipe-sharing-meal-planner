@@ -3,12 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import API from '../api/axios';
 import {
     Clock, Users, BarChart, Trash2, Edit3, ArrowLeft,
-    Scale, Droplet, Coffee, Soup, Sparkles, Package, Utensils,
-    Printer, Download, Image as ImageIcon, Share2
+     Coffee,  Sparkles, Package, Utensils,
+    Printer, 
 } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+// import html2canvas from 'html2canvas';
+// import { jsPDF } from 'jspdf';
 
 const RecipeDetail = () => {
     const { id } = useParams();
@@ -46,44 +46,44 @@ const RecipeDetail = () => {
         window.print();
     };
 
-    const handleDownloadPDF = async () => {
-        const element = document.getElementById('recipe-card-export');
-        if (!element) return;
-        const canvas = await html2canvas(element, { scale: 2 });
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-        pdf.save(`${recipe.title || 'Recipe'}.pdf`);
-    };
+    // const handleDownloadPDF = async () => {
+    //     const element = document.getElementById('recipe-card-export');
+    //     if (!element) return;
+    //     const canvas = await html2canvas(element, { scale: 2 });
+    //     const imgData = canvas.toDataURL('image/png');
+    //     const pdf = new jsPDF('p', 'mm', 'a4');
+    //     const pdfWidth = pdf.internal.pageSize.getWidth();
+    //     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    //     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    //     pdf.save(`${recipe.title || 'Recipe'}.pdf`);
+    // };
 
-    const handleDownloadImage = async () => {
-        const element = document.getElementById('recipe-card-export');
-        if (!element) return;
-        const canvas = await html2canvas(element, { scale: 2 });
-        const link = document.createElement('a');
-        link.download = `${recipe.title || 'Recipe'}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    };
+    // const handleDownloadImage = async () => {
+    //     const element = document.getElementById('recipe-card-export');
+    //     if (!element) return;
+    //     const canvas = await html2canvas(element, { scale: 2 });
+    //     const link = document.createElement('a');
+    //     link.download = `${recipe.title || 'Recipe'}.png`;
+    //     link.href = canvas.toDataURL('image/png');
+    //     link.click();
+    // };
 
-    const handleShare = async () => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: recipe.title,
-                    text: `Check out this recipe: ${recipe.title}`,
-                    url: window.location.href,
-                });
-            } catch (err) {
-                console.log('Share failed:', err);
-            }
-        } else {
-            navigator.clipboard.writeText(window.location.href);
-            alert("Link copied to clipboard!");
-        }
-    };
+    // const handleShare = async () => {
+    //     if (navigator.share) {
+    //         try {
+    //             await navigator.share({
+    //                 title: recipe.title,
+    //                 text: `Check out this recipe: ${recipe.title}`,
+    //                 url: window.location.href,
+    //             });
+    //         } catch (err) {
+    //             console.log('Share failed:', err);
+    //         }
+    //     } else {
+    //         navigator.clipboard.writeText(window.location.href);
+    //         alert("Link copied to clipboard!");
+    //     }
+    // };
 
     if (!recipe) {
         return (
@@ -146,7 +146,7 @@ const RecipeDetail = () => {
 
     const parseIngredient = (ing) => {
         if (!ing) return { quantity: '', unit: '', name: '' };
-        const regex = /^([\d\/\.\-\s½⅓¼¾]+)?\s*(tsp\.?|tbsp\.?|teaspoons?|tablespoons?|g|gm|grm|grms|gms|grams?|kg|kgs|ml|l|liters?|litres?|cup|cups|glass|glasses|pinch|pinches|pieces?|slices?|cloves?|cans?|bottles?|packs?|packets?|oz|ounces?)?\b\s*(.*)$/i;
+        const regex = /^([\d/.\-\s½⅓¼¾]+)?\s*(tsp\.?|tbsp\.?|teaspoons?|tablespoons?|g|gm|grm|grms|gms|grams?|kg|kgs|ml|l|liters?|litres?|cup|cups|glass|glasses|pinch|pinches|pieces?|slices?|cloves?|cans?|bottles?|packs?|packets?|oz|ounces?)?\b\s*(.*)$/i;
         const match = ing.trim().match(regex);
         if (match) {
             const qty = (match[1] || '').trim();

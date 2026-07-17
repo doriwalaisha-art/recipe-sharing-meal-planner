@@ -65,7 +65,7 @@ const generateRecipe = async (req, res) => {
 
         const ai = new GoogleGenAI({ apiKey });
 
-        // --- Step 1: Validate it's a food recipe ---
+
         const validationPrompt = `
             You are a food validation assistant.
             Determine whether the following title and description describe a real food recipe.
@@ -99,7 +99,6 @@ const generateRecipe = async (req, res) => {
             });
         }
 
-        // --- Step 2: Generate recipe ---
         const prompt = `
             You are an expert chef and recipe generator.
 
